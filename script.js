@@ -260,7 +260,7 @@ function calcularRota() {
     });
 }
 
-// --- IMPLEMENTAÇÃO DA TABELA DE 5 COLUNAS COM ALERTA DE ESTADO ---
+// --- IMPLEMENTAÇÃO DA TABELA DE 5 COLUNAS COM ALERTA DE ESTADO (FIX) ---
 
 function processarSegmentosRota(res) {
     const legs = res.routes[0].legs;
@@ -297,12 +297,14 @@ function processarSegmentosRota(res) {
         leg.steps.forEach((step) => {
             const instrucaoLimpa = step.instructions.replace(/<[^>]*>?/gm, '');
             
-            // Extração de Cidade e Estado
+            // Extração Real de Cidade e UF (Melhorada)
+            // Tentamos extrair da instrução do Google ou do ponto de partida do Leg
             const partesEnd = leg.start_address.split(',');
             let cidadeUF = "Rota";
             let ufAtual = "";
 
             if (partesEnd.length >= 3) {
+                // Pega o penúltimo elemento que geralmente é "Cidade - UF"
                 const trechoLocal = partesEnd[partesEnd.length - 3].trim();
                 cidadeUF = trechoLocal;
                 const ufMatch = trechoLocal.match(/\b([A-Z]{2})\b/);
@@ -321,7 +323,7 @@ function processarSegmentosRota(res) {
             estadoAnterior = ufAtual;
 
             // Extração da Referência (Via) - Busca por padrões como BR-XXX ou SP-XXX
-            const viaMatch = step.instructions.match(/\b([A-Z]{2}-\d{3})\b/) || step.instructions.match(/<b>(.*?)<\/b>/);
+            const viaMatch = step.instructions.match(/\b([A-Z]{2}-\d{3,4})\b/) || step.instructions.match(/<b>(.*?)<\/b>/);
             const referenciaVia = viaMatch ? viaMatch[1].replace(/<[^>]*>?/gm, '') : "Acesso";
 
             html += `
