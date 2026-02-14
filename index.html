@@ -51,6 +51,12 @@
             display: block;
         }
 
+        /* MUDANÇA SOLICITADA: Esconde o painel de deslocamento inicialmente */
+        #container-config-deslocamento {
+            display: none; 
+            flex-direction: column;
+        }
+
         @media print {
             .sidebar, #painel-custos-extra, .top-nav { display: none; }
             .map-container { width: 100%; }
@@ -133,8 +139,8 @@
                     <option value="remunerado_km">Remunerado R$ por KM vazio</option>
                     <option value="remunerado_rs">Remunerado R$ Fechado Deslocamento</option>
                 </select>
-                <input id="valorDeslocamentoKm" type="text" placeholder="R$ 0,00 por KM" style="display:none;">
-                <input id="valorDeslocamentoTotal" type="text" placeholder="R$ 0,00 Total" style="display:none;">
+                <input id="valorDeslocamentoKm" type="text" placeholder="R$ 0,00 por KM" style="display:none;" oninput="formatarMoeda(this)">
+                <input id="valorDeslocamentoTotal" type="text" placeholder="R$ 0,00 Total" style="display:none;" oninput="formatarMoeda(this)">
             </div>
             <li class="ponto-item sortable-item" id="li-origem">
                 <span class="handle">☰</span>
@@ -312,6 +318,37 @@
         </div>
     </div>
 </div>
+
+<script>
+    // Monitora o campo de Saída para mostrar o painel principal de deslocamento
+    document.getElementById("saida").addEventListener("input", function() {
+        const container = document.getElementById("container-config-deslocamento");
+        if (this.value.trim() !== "") {
+            container.style.display = "flex";
+        } else {
+            container.style.display = "none";
+            // Reseta valores se apagar
+            document.getElementById("tipoDeslocamento").value = "nao_remunerado";
+            document.getElementById("valorDeslocamentoKm").style.display = "none";
+            document.getElementById("valorDeslocamentoTotal").style.display = "none";
+        }
+    });
+
+    // Monitora o Select para mostrar os campos de valores específicos
+    document.getElementById("tipoDeslocamento").addEventListener("change", function() {
+        const valKm = document.getElementById("valorDeslocamentoKm");
+        const valTotal = document.getElementById("valorDeslocamentoTotal");
+        
+        valKm.style.display = "none";
+        valTotal.style.display = "none";
+
+        if (this.value === "remunerado_km") {
+            valKm.style.display = "block";
+        } else if (this.value === "remunerado_rs") {
+            valTotal.style.display = "block";
+        }
+    });
+</script>
 
 <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyClbY5ZvkjrMGP4nJmZzCcm4hUu5-fjZV0&libraries=places&callback=initMap" async defer></script>
 <script src="script.js?v=1.0.2"></script>
