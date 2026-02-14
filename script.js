@@ -370,8 +370,7 @@ function processarSegmentosRota(res) {
     
     // Chama sua função original de cálculos financeiros
     if (typeof atualizarFinanceiro === "function") atualizarFinanceiro();
-}
-    
+}    
     // Mantém a chamada do financeiro original
     const totalKm = ((distVazioMetros + distRotaMetros) / 1000).toFixed(1);
     html += `
@@ -479,6 +478,7 @@ window.onload = () => {
     script.async = true;
     document.head.appendChild(script);
 };
+
 
 
 
