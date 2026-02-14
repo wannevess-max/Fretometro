@@ -279,11 +279,11 @@ function processarSegmentosRota(res) {
         <table class="tabela-roteiro">
             <thead>
                 <tr>
-                    <th>Seq</th>
-                    <th>Estrada / Cidade</th>
-                    <th>Referência (Via)</th>
+                    <th style="width: 50px;">Seq</th>
+                    <th style="width: 150px;">Estrada / Cidade</th>
+                    <th style="width: 130px;">Referência (Via)</th>
                     <th>Nome do Trecho</th>
-                    <th style="text-align: right;">KM</th>
+                    <th style="text-align: right; width: 80px;">KM</th>
                 </tr>
             </thead>
             <tbody>`;
@@ -294,12 +294,13 @@ function processarSegmentosRota(res) {
     legs.forEach((leg, legIndex) => {
         const isVazio = (temSaida && legIndex === 0);
         
-        // Tentar extrair Cidade e Estado do endereço do Google para cada trecho
+        // Extração de Cidade e UF baseada no endereço reverso do Google para este trecho
         const partesEnd = leg.start_address.split(',');
         let cidadeUF = "Rota";
         let ufAtual = "";
 
         if (partesEnd.length >= 3) {
+            // Tenta pegar o padrão "Cidade - UF" que geralmente é o antepenúltimo item
             const trechoLocal = partesEnd[partesEnd.length - 3].trim();
             cidadeUF = trechoLocal;
             const ufMatch = trechoLocal.match(/\b([A-Z]{2})\b/);
@@ -310,37 +311,38 @@ function processarSegmentosRota(res) {
             const instrucaoHTML = step.instructions;
             const instrucaoLimpa = instrucaoHTML.replace(/<[^>]*>?/gm, '');
 
-            // Lógica de Alerta de Mudança de Estado (Inserida apenas se houver mudança real)
+            // Lógica de Alerta de Mudança de Estado
             if (ufAtual && estadoAnterior && ufAtual !== estadoAnterior) {
                 html += `
-                    <tr style="background: #111; color: #fff; font-weight: bold;">
-                        <td colspan="5" style="padding: 10px; text-align: center; letter-spacing: 2px;">
-                            ESTADO DE ${ufAtual} _________________________________________________________________
+                    <tr style="background: #1e293b; color: #ffffff; font-weight: bold;">
+                        <td colspan="5" style="padding: 12px; text-align: center; border: none; letter-spacing: 3px;">
+                            ENTRANDO NO ESTADO: ${ufAtual} __________________________________________________
                         </td>
                     </tr>`;
             }
             estadoAnterior = ufAtual;
 
-            // Extração da Referência (Via): Filtra para não pegar "Vire à esquerda"
-            // Prioridade: BR-XXX, SP-XXX ou o que estiver em negrito que não seja comando
-            let referenciaVia = "Acesso";
-            const viaMatch = instrucaoHTML.match(/\b([A-Z]{2}-\d{3,4})\b/);
+            // Extração de Referência (Via) - Filtrando comandos de direção
+            let referenciaVia = "Urbano";
+            const viaMatch = instrucaoHTML.match(/\b([A-Z]{2}-\d{3,4})\b/); // Busca BR-116, SP-330, etc
             const negritoMatch = instrucaoHTML.match(/<b>(.*?)<\/b>/);
 
             if (viaMatch) {
                 referenciaVia = viaMatch[1];
             } else if (negritoMatch) {
                 const bText = negritoMatch[1].replace(/<[^>]*>?/gm, '');
-                if (!/Vire|Mantenha|Siga|Curva|Saída/i.test(bText)) {
+                // Só aceita se NÃO for um comando de direção comum
+                const comandos = /Vire|Mantenha|Siga|Curva|Saída|Esquerda|Direita|Direção/i;
+                if (!comandos.test(bText)) {
                     referenciaVia = bText;
                 }
             }
 
             html += `
-                <tr style="${isVazio ? 'background: rgba(251, 146, 60, 0.05);' : ''}">
-                    <td style="font-weight: bold; color: #64748b;">${globalSeq}</td>
+                <tr style="${isVazio ? 'background: rgba(245, 158, 11, 0.1);' : ''}">
+                    <td style="font-weight: bold; color: #94a3b8;">${globalSeq}</td>
                     <td style="font-weight: 600; font-size: 11px;">${cidadeUF}</td>
-                    <td style="color: #2563eb; font-weight: bold;">${referenciaVia}</td>
+                    <td style="color: #2563eb; font-weight: bold; font-size: 11px;">${referenciaVia}</td>
                     <td style="font-size: 12px;">${instrucaoLimpa}</td>
                     <td style="text-align: right; font-weight: bold; font-size: 11px;">${step.distance.text}</td>
                 </tr>`;
@@ -352,13 +354,13 @@ function processarSegmentosRota(res) {
     
     const totalKm = ((distVazioMetros + distRotaMetros) / 1000).toFixed(1);
     html += `
-        <div class="roteiro-footer">
-            <div style="color: #64748b; font-size: 11px;">RELATÓRIO DE VIAGEM OPERACIONAL</div>
-            <div style="font-size: 16px;">KILOMETRAGEM TOTAL: <strong>${totalKm} km</strong></div>
+        <div class="roteiro-footer" style="margin-top: 15px; padding: 15px; background: #f8fafc; border-top: 2px solid #e2e8f0;">
+            <div style="color: #64748b; font-size: 10px; font-weight: bold;">RELATÓRIO DE VIAGEM OPERACIONAL</div>
+            <div style="font-size: 18px; color: #0f172a;">KILOMETRAGEM TOTAL: <strong>${totalKm.replace('.', ',')} km</strong></div>
         </div>`;
 
     listaEscrita.innerHTML = html;
-    atualizarFinanceiro();
+    if (typeof atualizarFinanceiro === "function") atualizarFinanceiro();
 }
 
 // --- CÁLCULOS FINANCEIROS (MANTIDO INTEGRAL) ---
@@ -456,3 +458,4 @@ window.onload = () => {
     script.async = true;
     document.head.appendChild(script);
 };
+
