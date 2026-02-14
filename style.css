@@ -428,3 +428,19 @@ input, select {
 .custos-list { margin: 10px 0; border-bottom: 1px solid #bfdbfe; padding-bottom: 5px; }
 .bold-row { font-weight: 600; margin-top: 4px; }
 .lucro-destaque { color: #16a34a; border-top-color: #bfdbfe; }
+
+#container-config-deslocamento {
+    display: none; /* Inicia escondido */
+    flex-direction: column;
+    background: var(--bg-body);
+    padding: 10px;
+    border-radius: 4px;
+    margin: 5px 0 10px 0;
+    border: 1px solid var(--border-color);
+}
+
+#container-config-deslocamento select, 
+#container-config-deslocamento input {
+    margin-top: 5px;
+    width: 100%;
+}
