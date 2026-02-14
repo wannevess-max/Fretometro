@@ -18,7 +18,7 @@
 <div class="wrapper">
     <div class="top-nav" id="topNav">
         <a onclick="toggleFrota()">🚛 Minha Frota</a>
-        <a onclick="toggleGoogleMaps()">🗺️ Roteirizar</a>
+        <a onclick="toggleGoogleMaps()">🗺️ Roteiro Escrito</a>
         <a onclick="document.getElementById('themeBtn').click()">🌙 Modo</a>
         <a onclick="window.print()">🖨️ Imprimir Relatório</a>
     </div>
@@ -255,15 +255,18 @@
         </div>
     </div>
 
-    <div id="painel-google-maps">
-        <div style="display:flex; justify-content: space-between; align-items: center; padding: 20px; border-bottom: 1px solid var(--border-color);">
-            <h2 id="maps-titulo">Rota Google Maps</h2>
-            <span style="cursor:pointer; font-size:24px;" onclick="toggleGoogleMaps()">&times;</span>
+    <div class="map-container">
+        <div id="map"></div>
+        <div id="painel-roteiro-escrito">
+            <div class="header-roteiro">
+                <h2>Roteiro de Viagem (Passo a Passo)</h2>
+                <span style="cursor:pointer; font-size:24px;" onclick="toggleGoogleMaps()">&times;</span>
+            </div>
+            <div id="lista-passo-a-passo">
+                <p style="padding: 20px; color: var(--text-sub);">Calcule uma rota para visualizar o roteiro detalhado aqui.</p>
+            </div>
         </div>
-        <div id="container-iframe-maps" style="flex-grow: 1; width: 100%;"></div>
     </div>
-
-    <div class="map-container"><div id="map"></div></div>
 </div>
 
 <script src="script.js?v=1.0.1"></script>
