@@ -49,7 +49,7 @@ body, html {
     height: 50px; 
     background: var(--bg-sidebar);
     border-bottom: 1px solid var(--border-color); 
-    z-index: 100; 
+    z-index: 1000; /* Aumentado para ficar sempre visível acima dos painéis */
     display: flex; 
     align-items: center; 
     padding: 0 20px; 
@@ -81,7 +81,8 @@ body, html {
     padding: 70px 20px 20px 20px; 
     overflow-y: auto; 
     z-index: 10; 
-    border-right: 1px solid var(--border-color); 
+    border-right: 1px solid var(--border-color);
+    flex-shrink: 0; /* Impede que a coluna seja espremida pelo mapa */
 }
 
 #painel-custos-extra {
@@ -89,10 +90,17 @@ body, html {
     width: 25%; 
     min-width: 320px;
     height: 100%; 
-    background: var(--bg-body);
+    background: var(--bg-sidebar);
     padding: 70px 20px 20px 20px; 
     overflow-y: auto;
     border-right: 1px solid var(--border-color);
+    flex-shrink: 0;
+}
+
+/* Regra para quando o painel de custos está aberto (JS adiciona a classe no body) */
+body.custos-open .map-container {
+    width: 75%;
+    flex-grow: 0;
 }
 
 /* PAINEL DE FROTA */
@@ -103,7 +111,7 @@ body, html {
     width: 50%; 
     height: 100%; 
     background: var(--bg-sidebar); 
-    z-index: 200; 
+    z-index: 1200; /* Acima do mapa e das sidebars */
     border-left: 1px solid var(--border-color);
     padding: 40px; 
     transition: right 0.5s cubic-bezier(0.16, 1, 0.3, 1);
@@ -121,6 +129,7 @@ body, html {
     flex-direction: column; 
     position: relative; 
     overflow: hidden; 
+    transition: width 0.3s ease; /* Transição suave ao abrir os custos */
 }
 
 #map { 
@@ -157,7 +166,7 @@ body, html {
     z-index: 10;
 }
 
-/* ESTILIZAÇÃO DA TABELA OPERACIONAL (NOVO) */
+/* ESTILIZAÇÃO DA TABELA OPERACIONAL */
 #lista-passo-a-passo { 
     padding: 0; 
     font-size: 13px; 
