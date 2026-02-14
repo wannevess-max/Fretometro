@@ -63,10 +63,12 @@ function restaurarLayout() {
     if (roteiroAberto) {
         document.getElementById('painel-roteiro-escrito')?.classList.add('active');
     }
+    
     if (custosAberto) {
         document.body.classList.add('custos-open');
         const p = document.getElementById('painel-custos-extra');
         if (p) p.style.display = 'block';
+        carregarSelectFrota();
     }
 }
 
@@ -328,6 +330,7 @@ function adicionarParada() {
 
 function carregarSelectFrota() {
     const sel = document.getElementById('selFrotaVinculo');
+    if(!sel) return;
     sel.innerHTML = '<option value="">-- Selecione um Veículo --</option>';
     frota.forEach(v => {
         const opt = document.createElement('option');
