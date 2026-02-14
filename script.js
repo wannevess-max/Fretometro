@@ -283,77 +283,90 @@ function processarSegmentosRota(res) {
     const legs = route.legs;
     const listaEscrita = document.getElementById("lista-passo-a-passo");
     
-    let distRotaMetros = 0;
-    legs.forEach(l => distRotaMetros += l.distance.value);
+    let distTotalMetros = legs.reduce((acc, leg) => acc + leg.distance.value, 0);
 
+    // Cabeçalho estilizado conforme o seu objetivo
     let html = `
-        <div style="font-family: 'Google Sans', Roboto, Arial, sans-serif; color: #3c4043; padding: 20px; background: #fff;">
-            <div style="font-size: 18px; margin-bottom: 8px; font-weight: 500;">${legs[0].start_address.split(',')[0]}</div>
-            <div style="font-size: 14px; color: #70757a; margin-bottom: 20px;">${legs[0].start_address}</div>
-            
-            <table style="width: 100%; border-collapse: collapse;">
+        <div style="font-family: Arial, sans-serif; border: 1px solid #ccc; padding: 15px;">
+            <h3 style="margin-top:0;">Resumo do Percurso (Estilo AE)</h3>
+            <table class="tabela-roteiro" style="width:100%; border-collapse: collapse; font-size: 12px;">
+                <thead>
+                    <tr style="background: #f1f1f1; border-bottom: 2px solid #333;">
+                        <th style="width: 40px; padding: 10px; text-align: left;">Seq</th>
+                        <th style="width: 180px; padding: 10px; text-align: left;">Estrada / Cidade</th>
+                        <th style="width: 150px; padding: 10px; text-align: left;">Referência (Via)</th>
+                        <th style="padding: 10px; text-align: left;">Nome do Trecho</th>
+                        <th style="width: 90px; padding: 10px; text-align: right;">KM</th>
+                    </tr>
+                </thead>
                 <tbody>`;
 
     let globalSeq = 1;
 
     legs.forEach((leg) => {
-        // No Google Maps, os trechos resumidos que você vê no HTML 
-        // são extraídos dos 'steps' que possuem distâncias consideráveis.
-        leg.steps.forEach((step) => {
-            const instrucaoRaw = step.instructions;
-            const distanciaTexto = step.distance.text;
-            const tempoTexto = step.duration.text;
-            const distanciaMetros = step.distance.value;
+        // Filtramos os steps para pegar APENAS o que o Google mostra no resumo principal
+        // Isso remove os micro-passos de "vire à esquerda"
+        const stepsResumidos = leg.steps.filter(step => {
+            const instrucao = step.instructions.toLowerCase();
+            const km = step.distance.value / 1000;
+            // Critério: ser rodovia (BR/SP/BA/Rod) OU ter mais de 3km
+            return km > 3 || /rod\.|rodovia|br-|sp-|ba-|mg-|pb-/.test(instrucao);
+        });
 
-            // FILTRO: Só mostramos no resumo trechos maiores que 2km 
-            // OU trechos que mencionam explicitamente Rodovias (BR, SP, Rod.)
-            const ehRodovia = /Rod\.|Rodovia|BR-|SP-|BA-/.test(instrucaoRaw);
-            
-            if (distanciaMetros > 2000 || ehRodovia) {
-                // Limpeza de tags HTML das instruções do Google
-                const instrucaoLimpa = instrucaoRaw.replace(/<[^>]*>?/gm, '');
+        stepsResumidos.forEach((step) => {
+            const instrucaoHTML = step.instructions;
+            const instrucaoLimpa = instrucaoHTML.replace(/<[^>]*>?/gm, '');
 
-                html += `
-                    <tr>
-                        <td style="vertical-align: top; padding: 15px 0; width: 30px;">
-                            <span style="color: #70757a;"></span>
-                        </td>
-                        <td style="padding: 15px 0; border-bottom: 1px solid #e9ecef;">
-                            <div style="font-size: 14px; line-height: 1.5; color: #202124;">
-                                <strong>${instrucaoLimpa}</strong>
-                            </div>
-                            <div style="font-size: 13px; color: #70757a; margin-top: 4px;">
-                                ${tempoTexto} (${distanciaTexto})
-                            </div>
-                        </td>
-                    </tr>`;
+            // 1. Extração da Via (Ex: BR-381, Rod. Dom Pedro I)
+            let via = "Acesso";
+            const viaMatch = instrucaoHTML.match(/\b([A-Z]{2}-\d{3})\b/);
+            if (viaMatch) {
+                via = viaMatch[1];
+            } else {
+                const bTags = instrucaoHTML.match(/<b>(.*?)<\/b>/g);
+                if (bTags) {
+                    const textoForte = bTags[0].replace(/<[^>]*>?/gm, '');
+                    if (textoForte.length > 3) via = textoForte;
+                }
             }
+
+            // 2. Extração da Cidade/UF baseada na instrução do Google
+            // O arquivo .html mostra que o Google insere o nome da cidade no final da instrução "em [Cidade]"
+            let cidadeExibicao = "Rota";
+            const cidadeMatch = instrucaoHTML.match(/em\s<b>(.*?)\s-\s([A-Z]{2})<\/b>/) || 
+                               instrucaoHTML.match(/direção a\s<b>(.*?)\s-\s([A-Z]{2})<\/b>/);
+            
+            if (cidadeMatch) {
+                cidadeExibicao = `${cidadeMatch[1]} / ${cidadeMatch[2]}`;
+            } else {
+                // Fallback: pega a cidade do endereço do trecho caso não ache no texto
+                const partesEndereco = leg.start_address.split(',');
+                if (partesEndereco.length >= 2) {
+                    cidadeExibicao = partesEndereco[partesEndereco.length - 2].trim().replace('-', '/');
+                }
+            }
+
+            html += `
+                <tr style="border-bottom: 1px solid #eee;">
+                    <td style="padding: 8px;">${globalSeq++}</td>
+                    <td style="padding: 8px;">${cidadeExibicao}</td>
+                    <td style="padding: 8px; font-weight: bold; color: #1a56db;">${via}</td>
+                    <td style="padding: 8px; color: #444;">${instrucaoLimpa}</td>
+                    <td style="padding: 8px; text-align: right; font-weight: bold;">${step.distance.text}</td>
+                </tr>`;
         });
     });
 
-    // Destino Final (conforme o seu exemplo)
-    const destinoFinal = legs[legs.length - 1];
-    html += `
-                </tbody>
-            </table>
-            
-            <div style="margin-top: 20px;">
-                <div style="font-size: 18px; font-weight: 500;">${destinoFinal.end_address.split(',')[0]}</div>
-                <div style="font-size: 14px; color: #70757a;">${destinoFinal.end_address.split(',').slice(-1)[0].trim()}</div>
-            </div>
-
-            <div style="margin-top: 30px; padding: 15px; background: #f8f9fa; border-radius: 8px; border: 1px solid #dadce0;">
-                <div style="display: flex; justify-content: space-between; font-weight: bold;">
-                    <span>RESUMO DA ROTA OPERACIONAL</span>
-                    <span>TOTAL: ${(distRotaMetros/1000).toFixed(1)} KM</span>
-                </div>
-            </div>
-        </div>`;
-
-    if (listaEscrita) {
-        listaEscrita.innerHTML = html;
-    }
+    html += `</tbody></table>`;
     
+    const kmTotal = (distTotalMetros / 1000).toFixed(1).replace('.', ',');
+    html += `
+        <div style="margin-top: 15px; padding: 10px; border: 2px solid #000; font-weight: bold;">
+            RELATÓRIO DE VIAGEM OPERACIONAL | DISTÂNCIA TOTAL: ${kmTotal} km
+        </div>
+    </div>`;
+
+    if (listaEscrita) listaEscrita.innerHTML = html;
     if (typeof atualizarFinanceiro === "function") atualizarFinanceiro();
 }
 function atualizarFinanceiro() {
@@ -461,6 +474,7 @@ window.onload = () => {
     script.defer = true;
     document.head.appendChild(script);
 };
+
 
 
 
