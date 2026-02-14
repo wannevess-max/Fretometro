@@ -11,14 +11,14 @@
 
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     
-    <link rel="stylesheet" href="style.css?v=1.0.1">
+    <link rel="stylesheet" href="style.css?v=1.0.2">
 </head>
 <body>
 
 <div class="wrapper">
     <div class="top-nav" id="topNav">
-        <a onclick="toggleFrota()">🚛 Minha Frota</a>
-        <a onclick="toggleGoogleMaps()">🗺️ Roteiro Escrito</a>
+        <a onclick="toggleFrota()"> Minha Frota</a>
+        <a onclick="toggleGoogleMaps()">🗺️ Roteiro Resumido</a>
         <a onclick="document.getElementById('themeBtn').click()">🌙 Modo</a>
         <a onclick="window.print()">🖨️ Imprimir Relatório</a>
     </div>
@@ -259,16 +259,16 @@
         <div id="map"></div>
         <div id="painel-roteiro-escrito">
             <div class="header-roteiro">
-                <h2>Roteiro de Viagem (Passo a Passo)</h2>
+                <h2>Resumo do Percurso (Estilo AE)</h2>
                 <span style="cursor:pointer; font-size:24px;" onclick="toggleGoogleMaps()">&times;</span>
             </div>
             <div id="lista-passo-a-passo">
-                <p style="padding: 20px; color: var(--text-sub);">Calcule uma rota para visualizar o roteiro detalhado aqui.</p>
+                <p style="padding: 20px; color: var(--text-sub);">Calcule uma rota para visualizar o roteiro resumido.</p>
             </div>
         </div>
     </div>
 </div>
 
-<script src="script.js?v=1.0.1"></script>
+<script src="script.js?v=1.0.2"></script>
 </body>
 </html>
