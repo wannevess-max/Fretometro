@@ -39,6 +39,7 @@ body, html {
     height: 100vh; 
     width: 100vw; 
     position: relative; 
+    overflow: hidden;
 }
 
 /* NAVEGAÇÃO SUPERIOR */
@@ -98,9 +99,8 @@ body, html {
 }
 
 /* Regra para quando o painel de custos está aberto (JS adiciona a classe no body) */
-body.custos-open .map-container {
-    width: 75%;
-    flex-grow: 0;
+body.custos-open #painel-custos-extra {
+    display: block;
 }
 
 /* PAINEL DE FROTA */
@@ -129,7 +129,7 @@ body.custos-open .map-container {
     flex-direction: column; 
     position: relative; 
     overflow: hidden; 
-    transition: width 0.3s ease; /* Transição suave ao abrir os custos */
+    transition: all 0.3s ease; /* Transição suave ao abrir os custos */
 }
 
 #map { 
