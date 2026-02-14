@@ -420,3 +420,6 @@ function formatarMoeda(input) {
 });
 
 document.getElementById('imposto').addEventListener('change', atualizarFinanceiro);
+
+// Inicialização imediata do layout
+restaurarLayout();
