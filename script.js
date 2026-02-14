@@ -10,11 +10,29 @@ const darkStyle = [
     { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#17263c" }] }
 ];
 
+// --- FUNÇÕES DE INTERFACE ---
+
 function toggleFrota() { 
     const painel = document.getElementById('painel-frota');
     painel.classList.toggle('active');
     renderFrota();
 }
+
+function toggleGoogleMaps() {
+    const painel = document.getElementById('painel-roteiro-escrito');
+    painel.classList.toggle('active');
+    
+    // AJUSTE DINÂMICO: Força o mapa a recalcular o tamanho do container e centralizar a rota
+    setTimeout(() => { 
+        google.maps.event.trigger(map, "resize"); 
+        if (directionsRenderer.getDirections()) {
+            const res = directionsRenderer.getDirections();
+            map.fitBounds(res.routes[0].bounds);
+        }
+    }, 400);
+}
+
+// --- GESTÃO DE FROTA (MANTIDO) ---
 
 function salvarVeiculo() {
     const idx = parseInt(document.getElementById('f-edit-index').value);
@@ -109,6 +127,8 @@ function vincularFrota(sel) {
     atualizarFinanceiro();
 }
 
+// --- AUXILIARES E CUSTOS ---
+
 function toggleAparelhoFrio() {
     const isFrigo = document.getElementById("tipoCarga").value === "frigorifica";
     document.getElementById("container-frio-input").style.display = isFrigo ? "block" : "none";
@@ -141,8 +161,15 @@ function converterParaFloat(stringMoeda) {
     return parseFloat(stringMoeda.replace("R$ ", "").replace(/\./g, "").replace(",", ".")) || 0;
 }
 
+// --- CORE DO APLICATIVO (MAPS) ---
+
 function initApp() {
-    map = new google.maps.Map(document.getElementById("map"), { center: { lat: -14.235, lng: -51.925 }, zoom: 4, mapTypeControl: false });
+    map = new google.maps.Map(document.getElementById("map"), { 
+        center: { lat: -14.235, lng: -51.925 }, 
+        zoom: 4, 
+        mapTypeControl: false,
+        streetViewControl: false
+    });
     directionsRenderer = new google.maps.DirectionsRenderer({ draggable: true, map: map });
     directionsService = new google.maps.DirectionsService();
     
@@ -208,7 +235,7 @@ function adicionarCampoParada() {
     li.innerHTML = `
         <span class="handle">☰</span>
         <input id="${id}" type="text" placeholder="Parada" autocomplete="off">
-        <button class="btn-remove" onclick="this.parentElement.remove()">✕</button>
+        <button class="btn-remove" onclick="this.parentElement.remove(); calcularRota();">✕</button>
     `;
     document.getElementById("lista-pontos").insertBefore(li, document.getElementById("li-destino"));
     setupAutocomplete(id);
@@ -234,6 +261,8 @@ function calcularRota() {
     });
 }
 
+// --- NOVO ROTEIRO RESUMIDO (ESTILO PÁGINA 2 PDF) ---
+
 function processarSegmentosRota(res) {
     const legs = res.routes[0].legs;
     const listaEscrita = document.getElementById("lista-passo-a-passo");
@@ -247,36 +276,46 @@ function processarSegmentosRota(res) {
         distRotaMetros = legs.reduce((acc, leg) => acc + leg.distance.value, 0);
     }
 
-    // GERAR ROTEIRO ESCRITO
-    let htmlRoteiro = "";
+    // GERAÇÃO DA TABELA OPERACIONAL
+    let html = `
+        <table style="width:100%; border-collapse: collapse; font-family: sans-serif; font-size: 12px; color: var(--text-main);">
+            <thead>
+                <tr style="background: var(--border-color); text-align: left;">
+                    <th style="padding: 10px; border-bottom: 2px solid var(--accent);">SEQ</th>
+                    <th style="padding: 10px; border-bottom: 2px solid var(--accent);">TRECHO / CIDADE</th>
+                    <th style="padding: 10px; border-bottom: 2px solid var(--accent); text-align: right;">DISTÂNCIA</th>
+                </tr>
+            </thead>
+            <tbody>`;
+
     legs.forEach((leg, index) => {
         const isVazio = (temSaida && index === 0);
-        const corHeader = isVazio ? "#fb923c" : "#2563eb";
-        const label = isVazio ? "DESLOCAMENTO VAZIO" : `TRECHO ${index + (temSaida ? 0 : 1)}`;
+        const seq = (index + 1).toString().padStart(2, '0');
+        const descInicio = leg.start_address.split(',')[0];
+        const descFim = leg.end_address.split(',')[0];
+        const corLinha = isVazio ? 'background: rgba(251, 146, 60, 0.1);' : '';
 
-        htmlRoteiro += `
-            <div style="margin-top: 20px;">
-                <h3 style="color: ${corHeader}; font-size: 14px; margin-bottom: 5px; border-bottom: 1px solid var(--border-color); padding-bottom: 5px;">
-                    ${label}: ${leg.start_address.split(',')[0]} ➔ ${leg.end_address.split(',')[0]}
-                </h3>
-                <p style="font-size: 11px; color: var(--text-sub); margin-bottom: 10px;">
-                    Distância: ${leg.distance.text} | Tempo est.: ${leg.duration.text}
-                </p>
-        `;
-        leg.steps.forEach(step => {
-            htmlRoteiro += `
-                <div class="adp-substep">
-                    <span class="adp-distance">${step.distance.text}</span>
-                    <span class="adp-instructions">${step.instructions}</span>
-                </div>
-            `;
-        });
-        htmlRoteiro += `</div>`;
+        html += `
+            <tr style="border-bottom: 1px solid var(--border-color); ${corLinha}">
+                <td style="padding: 10px; font-weight: bold; color: ${isVazio ? '#fb923c' : 'var(--accent)'}">${seq}</td>
+                <td style="padding: 10px;">
+                    <div style="font-size: 9px; color: var(--text-sub);">${isVazio ? 'DESLOCAMENTO VAZIO' : 'ROTA CARREGADA'}</div>
+                    <strong>${descInicio}</strong> ➔ <strong>${descFim}</strong>
+                </td>
+                <td style="padding: 10px; text-align: right; font-weight: bold;">${leg.distance.text}</td>
+            </tr>`;
     });
 
-    listaEscrita.innerHTML = htmlRoteiro || "<p>Calcule uma rota para visualizar o roteiro.</p>";
+    html += `</tbody></table>`;
+    
+    const totalKm = ((distVazioMetros + distRotaMetros) / 1000).toFixed(1);
+    html += `<div style="padding:15px; text-align:right; font-weight:bold; color:var(--text-sub);">DISTÂNCIA TOTAL: ${totalKm} km</div>`;
+
+    listaEscrita.innerHTML = html;
     atualizarFinanceiro();
 }
+
+// --- CÁLCULOS FINANCEIROS (MANTIDO) ---
 
 function atualizarFinanceiro() {
     const kmVazio = distVazioMetros / 1000; 
@@ -363,12 +402,6 @@ function limparPainelCustos() {
     document.getElementById("selFrotaVinculo").value = "";
     document.getElementById("tipoCarga").value = "seca";
     toggleAparelhoFrio();
-}
-
-function toggleGoogleMaps() {
-    const painel = document.getElementById('painel-roteiro-escrito');
-    painel.classList.toggle('active');
-    setTimeout(() => { google.maps.event.trigger(map, "resize"); }, 400);
 }
 
 window.onload = () => {
