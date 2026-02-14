@@ -31,7 +31,7 @@ function toggleGoogleMaps() {
     }, 400);
 }
 
-// --- GESTÃO DE FROTA (MANTIDO INTEGRAL) ---
+// --- GESTÃO DE FROTA ---
 
 function salvarVeiculo() {
     const idx = parseInt(document.getElementById('f-edit-index').value);
@@ -63,6 +63,7 @@ function salvarVeiculo() {
 
 function renderFrota() {
     const container = document.getElementById('lista-v-render');
+    if(!container) return;
     container.innerHTML = frota.map((v, i) => `
         <div class="veiculo-card">
             <div><b>${v.nome}</b><br><small>${v.eixos} Eixos | ${v.consumo} Km/L</small></div>
@@ -267,7 +268,6 @@ function processarSegmentosRota(res) {
     const listaEscrita = document.getElementById("lista-passo-a-passo");
     const temSaida = document.getElementById("saida").value;
 
-    // Mantém as variáveis globais de distância para não quebrar seus cálculos financeiros
     if (temSaida && legs.length >= 2) {
         distVazioMetros = legs[0].distance.value;
         distRotaMetros = legs.slice(1).reduce((acc, leg) => acc + leg.distance.value, 0);
@@ -294,15 +294,11 @@ function processarSegmentosRota(res) {
 
     legs.forEach((leg, legIndex) => {
         const isVazio = (temSaida && legIndex === 0);
-        
-        // --- LÓGICA DE EXTRAÇÃO DE CIDADE MELHORADA ---
-        // O start_address do Google costuma ser: "Rua, Bairro, Cidade - UF, CEP, País"
         const partesEnd = leg.start_address.split(',');
         let cidadeUF = "Rota";
         let ufAtual = "";
 
         if (partesEnd.length >= 3) {
-            // Pegamos o trecho que normalmente contém "Cidade - UF"
             const trechoLocal = partesEnd[partesEnd.length - 3].trim();
             cidadeUF = trechoLocal;
             const ufMatch = trechoLocal.match(/\b([A-Z]{2})\b/);
@@ -313,7 +309,6 @@ function processarSegmentosRota(res) {
             const instrucaoHTML = step.instructions;
             const instrucaoLimpa = instrucaoHTML.replace(/<[^>]*>?/gm, '');
 
-            // --- DIVISA DE ESTADO (LINHA DE DESTAQUE) ---
             if (ufAtual && estadoAnterior && ufAtual !== estadoAnterior) {
                 html += `
                     <tr style="background: #0f172a; color: white;">
@@ -324,22 +319,19 @@ function processarSegmentosRota(res) {
             }
             estadoAnterior = ufAtual;
 
-            // --- LÓGICA DE LIMPEZA DA COLUNA REFERÊNCIA (ANTI-POLUIÇÃO) ---
             let viaRef = "Urbano";
             const viaSigla = instrucaoHTML.match(/\b([A-Z]{2}-\d{3,4})\b/); 
-            const textoNegrito = instrucaoHTML.match(/<b>(.*?)<\/b>/g); // Pega todos os negritos
+            const textoNegrito = instrucaoHTML.match(/<b>(.*?)<\/b>/g);
 
             if (viaSigla) {
                 viaRef = viaSigla[1]; 
             } else if (textoNegrito) {
-                // Filtramos os termos em negrito para achar o nome da via, ignorando comandos
                 const comandosProibidos = /Vire|Mantenha|Siga|Curva|Saída|Esquerda|Direita|Direção|ª|Acesso/i;
-                
                 for (let n of textoNegrito) {
                     let bText = n.replace(/<[^>]*>?/gm, '');
                     if (!comandosProibidos.test(bText) && bText.length > 2) {
                         viaRef = bText;
-                        break; // Pega o primeiro negrito que pareça um nome de rua/estrada
+                        break;
                     }
                 }
             }
@@ -357,8 +349,6 @@ function processarSegmentosRota(res) {
     });
 
     html += `</tbody></table>`;
-    
-    // Rodapé da Tabela
     const totalKm = ((distVazioMetros + distRotaMetros) / 1000).toFixed(1);
     html += `
         <div style="margin-top: 15px; padding: 15px; background: #f8fafc; border-top: 2px solid #cbd5e1; display: flex; justify-content: space-between; align-items: center;">
@@ -367,23 +357,10 @@ function processarSegmentosRota(res) {
         </div>`;
 
     listaEscrita.innerHTML = html;
-    
-    // Chama sua função original de cálculos financeiros
-    if (typeof atualizarFinanceiro === "function") atualizarFinanceiro();
-}    
-    // Mantém a chamada do financeiro original
-    const totalKm = ((distVazioMetros + distRotaMetros) / 1000).toFixed(1);
-    html += `
-        <div style="margin-top: 10px; padding: 10px; border-top: 2px solid #334155; font-weight: bold; display: flex; justify-content: space-between;">
-            <span>RELATÓRIO OPERACIONAL</span>
-            <span>TOTAL: ${totalKm.replace('.', ',')} KM</span>
-        </div>`;
-
-    listaEscrita.innerHTML = html;
     if (typeof atualizarFinanceiro === "function") atualizarFinanceiro();
 }
 
-// --- CÁLCULOS FINANCEIROS (MANTIDO INTEGRAL) ---
+// --- CÁLCULOS FINANCEIROS ---
 
 function atualizarFinanceiro() {
     const kmVazio = distVazioMetros / 1000; 
@@ -407,16 +384,16 @@ function atualizarFinanceiro() {
     const valorDoImposto = freteTotalComImposto - baseCalculoParaImposto;
     const opt = { minimumFractionDigits: 2, maximumFractionDigits: 2 };
 
-    document.getElementById("txt-km-vazio-det").innerText = kmVazio.toFixed(1) + " km";
-    document.getElementById("txt-km-rota-det").innerText = kmRota.toFixed(1) + " km";
-    document.getElementById("txt-km-total").innerText = kmTotal.toFixed(1) + " km";
-    document.getElementById("txt-frete-base").innerText = "R$ " + freteBase.toLocaleString('pt-BR', opt);
-    document.getElementById("txt-valor-deslocamento-fin").innerText = "R$ " + valorDeslocamento.toLocaleString('pt-BR', opt);
-    document.getElementById("txt-valor-imp").innerText = "R$ " + valorDoImposto.toLocaleString('pt-BR', opt);
-    document.getElementById("txt-frete-total").innerText = "R$ " + freteTotalComImposto.toLocaleString('pt-BR', opt);
+    if(document.getElementById("txt-km-vazio-det")) document.getElementById("txt-km-vazio-det").innerText = kmVazio.toFixed(1) + " km";
+    if(document.getElementById("txt-km-rota-det")) document.getElementById("txt-km-rota-det").innerText = kmRota.toFixed(1) + " km";
+    if(document.getElementById("txt-km-total")) document.getElementById("txt-km-total").innerText = kmTotal.toFixed(1) + " km";
+    if(document.getElementById("txt-frete-base")) document.getElementById("txt-frete-base").innerText = "R$ " + freteBase.toLocaleString('pt-BR', opt);
+    if(document.getElementById("txt-valor-deslocamento-fin")) document.getElementById("txt-valor-deslocamento-fin").innerText = "R$ " + valorDeslocamento.toLocaleString('pt-BR', opt);
+    if(document.getElementById("txt-valor-imp")) document.getElementById("txt-valor-imp").innerText = "R$ " + valorDoImposto.toLocaleString('pt-BR', opt);
+    if(document.getElementById("txt-frete-total")) document.getElementById("txt-frete-total").innerText = "R$ " + freteTotalComImposto.toLocaleString('pt-BR', opt);
 
-    document.getElementById("txt-an-frete-liquido").innerText = "R$ " + freteTotalComImposto.toLocaleString('pt-BR', opt);
-    document.getElementById("txt-an-imposto").innerText = "R$ " + valorDoImposto.toLocaleString('pt-BR', opt);
+    if(document.getElementById("txt-an-frete-liquido")) document.getElementById("txt-an-frete-liquido").innerText = "R$ " + freteTotalComImposto.toLocaleString('pt-BR', opt);
+    if(document.getElementById("txt-an-imposto")) document.getElementById("txt-an-imposto").innerText = "R$ " + valorDoImposto.toLocaleString('pt-BR', opt);
 
     const precoDiesel = converterParaFloat(document.getElementById("custoDieselLitro").value);
     const consumoDiesel = parseFloat(document.getElementById("consumoDieselMedia").value) || 0;
@@ -440,27 +417,32 @@ function atualizarFinanceiro() {
             document.getElementById("row-an-frio").style.display = "flex";
             document.getElementById("txt-an-frio").innerText = "R$ " + custoFrioTotal.toLocaleString('pt-BR', opt);
         }
-    } else {
+    } else if(document.getElementById("row-an-frio")) {
         document.getElementById("row-an-frio").style.display = "none";
     }
 
     const totalCustos = custoDieselTotal + custoArlaTotal + pedagio + custoManutTotal + custoFrioTotal;
     const lucroReal = freteTotalComImposto - totalCustos - valorDoImposto;
 
-    document.getElementById("txt-an-diesel").innerText = "R$ " + custoDieselTotal.toLocaleString('pt-BR', opt);
-    document.getElementById("txt-an-arla").innerText = "R$ " + custoArlaTotal.toLocaleString('pt-BR', opt);
-    document.getElementById("txt-an-pedagio").innerText = "R$ " + pedagio.toLocaleString('pt-BR', opt);
-    document.getElementById("txt-an-manut").innerText = "R$ " + custoManutTotal.toLocaleString('pt-BR', opt);
-    document.getElementById("txt-total-custos").innerText = "R$ " + totalCustos.toLocaleString('pt-BR', opt);
-    document.getElementById("txt-lucro-real").innerText = "R$ " + lucroReal.toLocaleString('pt-BR', opt);
-    document.getElementById("txt-lucro-real").style.color = (lucroReal < 0) ? "#ef4444" : "#16a34a";
+    if(document.getElementById("txt-an-diesel")) document.getElementById("txt-an-diesel").innerText = "R$ " + custoDieselTotal.toLocaleString('pt-BR', opt);
+    if(document.getElementById("txt-an-arla")) document.getElementById("txt-an-arla").innerText = "R$ " + custoArlaTotal.toLocaleString('pt-BR', opt);
+    if(document.getElementById("txt-an-pedagio")) document.getElementById("txt-an-pedagio").innerText = "R$ " + pedagio.toLocaleString('pt-BR', opt);
+    if(document.getElementById("txt-an-manut")) document.getElementById("txt-an-manut").innerText = "R$ " + custoManutTotal.toLocaleString('pt-BR', opt);
+    if(document.getElementById("txt-total-custos")) document.getElementById("txt-total-custos").innerText = "R$ " + totalCustos.toLocaleString('pt-BR', opt);
+    
+    const elLucro = document.getElementById("txt-lucro-real");
+    if(elLucro) {
+        elLucro.innerText = "R$ " + lucroReal.toLocaleString('pt-BR', opt);
+        elLucro.style.color = (lucroReal < 0) ? "#ef4444" : "#16a34a";
+    }
 
     const pVazio = kmTotal > 0 ? (kmVazio / kmTotal * 100) : 0;
-    document.getElementById("visual-vazio").style.width = pVazio + "%";
-    document.getElementById("perc-vazio").innerText = pVazio.toFixed(1) + "%";
-    document.getElementById("perc-rota").innerText = (100 - pVazio).toFixed(1) + "%";
+    if(document.getElementById("visual-vazio")) document.getElementById("visual-vazio").style.width = pVazio + "%";
+    if(document.getElementById("perc-vazio")) document.getElementById("perc-vazio").innerText = pVazio.toFixed(1) + "%";
+    if(document.getElementById("perc-rota")) document.getElementById("perc-rota").innerText = (100 - pVazio).toFixed(1) + "%";
+    
     const rKmReal = kmTotal > 0 ? ((freteBase + valorDeslocamento) / kmTotal) : 0;
-    document.getElementById("txt-km-real").innerText = "R$ " + rKmReal.toLocaleString('pt-BR', opt);
+    if(document.getElementById("txt-km-real")) document.getElementById("txt-km-real").innerText = "R$ " + rKmReal.toLocaleString('pt-BR', opt);
 }
 
 function limparPainelCustos() {
@@ -478,8 +460,3 @@ window.onload = () => {
     script.async = true;
     document.head.appendChild(script);
 };
-
-
-
-
-
