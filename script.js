@@ -289,7 +289,7 @@ function processarSegmentosRota(res) {
                     <th style="width: 180px; padding: 10px; text-align: left;">Estrada / Cidade</th>
                     <th style="width: 130px; padding: 10px; text-align: left;">Referência (Via)</th>
                     <th style="padding: 10px; text-align: left;">Nome do Trecho</th>
-                    <th style="width: 80px; padding: 10px; text-align: right;">KM</th>
+                    <th style="width: 90px; padding: 10px; text-align: right;">KM</th>
                 </tr>
             </thead>
             <tbody>`;
@@ -297,85 +297,89 @@ function processarSegmentosRota(res) {
     let globalSeq = 1;
     let estadoAnterior = "";
     
-    // OBJETO ACUMULADOR: Para agrupar micro-passos em grandes trechos
-    let acumulador = {
-        cidade: "",
-        via: "",
-        descricao: "",
-        distancia: 0,
-        uf: ""
-    };
+    // Variáveis para controlar o agrupamento
+    let cidadeAtual = "";
+    let viaAtual = "";
+    let distanciaAcumulada = 0;
+    let instrucaoInicial = "";
+    let ufAtual = "";
 
     legs.forEach((leg) => {
         distRotaMetros += leg.distance.value;
 
-        leg.steps.forEach((step) => {
+        leg.steps.forEach((step, index) => {
             const instrucaoHTML = step.instructions;
-            
-            // 1. Identifica a Via (Ex: BR-116, SP-330 ou nome em negrito)
-            let viaAtual = "Acesso";
+            const textoLimpo = instrucaoHTML.replace(/<[^>]*>?/gm, '');
+
+            // 1. Identifica a Via (Sigla ou nome em negrito)
+            let viaNoPasso = "Acesso";
             const viaSigla = instrucaoHTML.match(/\b([A-Z]{2}-\d{3})\b/);
             if (viaSigla) {
-                viaAtual = viaSigla[1];
+                viaNoPasso = viaSigla[1];
             } else {
                 const bTag = instrucaoHTML.match(/<b>(.*?)<\/b>/);
-                if (bTag) viaAtual = bTag[1].replace(/<[^>]*>?/gm, '');
+                if (bTag) {
+                    let txt = bTag[1].replace(/<[^>]*>?/gm, '');
+                    if (txt.includes("Rod.") || txt.includes("Rodovia") || txt.includes("Av.")) viaNoPasso = txt;
+                }
             }
 
-            // 2. Tenta extrair a Cidade/UF do local atual deste passo
-            // Usamos uma busca simples no texto ou mantemos a do leg se falhar
-            let localPartes = leg.start_address.split(',');
-            let cidadeUfAtual = localPartes.length >= 2 ? localPartes[localPartes.length - 2].trim().replace('-', '/') : "Rota";
-            let ufPasso = (cidadeUfAtual.match(/[A-Z]{2}$/) || [""])[0];
+            // 2. Tenta pegar a cidade aproximada através da instrução (O Google costuma citar a cidade em trechos longos)
+            // Caso não ache, mantém a cidade do leg
+            let cidadeNoPasso = leg.start_address.split(',')[2]?.trim().replace('-', '/') || "Rota";
+            let ufNoPasso = (cidadeNoPasso.match(/[A-Z]{2}$/) || [""])[0];
 
-            // 3. LÓGICA DE AGRUPAMENTO (O "pulo do gato")
-            // Se a via for a mesma da linha anterior, só somamos a distância e ignoramos o texto de "vire"
-            if (acumulador.via === viaAtual && acumulador.via !== "Acesso") {
-                acumulador.distancia += step.distance.value;
+            // 3. Lógica de QUEBRA: Se mudou a via ou a cidade, imprime o que acumulou e começa novo
+            if (index === 0 && !viaAtual) {
+                // Primeiro passo da viagem
+                viaAtual = viaNoPasso;
+                cidadeAtual = cidadeNoPasso;
+                ufAtual = ufNoPasso;
+                instrucaoInicial = textoLimpo;
+                distanciaAcumulada = step.distance.value;
+            } else if (viaNoPasso !== viaAtual || (step.distance.value > 5000 && cidadeNoPasso !== cidadeAtual)) {
+                // Imprime a linha acumulada
+                renderizarLinha();
+
+                // Reinicia acumuladores para o novo trecho
+                viaAtual = viaNoPasso;
+                cidadeAtual = cidadeNoPasso;
+                ufAtual = ufNoPasso;
+                instrucaoInicial = textoLimpo;
+                distanciaAcumulada = step.distance.value;
             } else {
-                // Se mudou a via, imprime a linha anterior (se existir) e começa uma nova
-                if (acumulador.distancia > 0) {
-                    renderizarLinhaAcumulada();
-                }
-
-                acumulador = {
-                    cidade: cidadeUfAtual,
-                    via: viaAtual,
-                    descricao: instrucaoHTML.replace(/<[^>]*>?/gm, ''),
-                    distancia: step.distance.value,
-                    uf: ufPasso
-                };
+                // Continua na mesma via/cidade: apenas soma distância
+                distanciaAcumulada += step.distance.value;
             }
         });
     });
 
-    // Imprime o último trecho
-    renderizarLinhaAcumulada();
+    // Renderiza o último trecho
+    renderizarLinha();
 
-    function renderizarLinhaAcumulada() {
-        // Filtro: só mostra trechos relevantes (mais de 500m) para evitar lixo
-        if (acumulador.distancia < 500 && globalSeq > 1) return;
+    function renderizarLinha() {
+        if (distanciaAcumulada <= 0) return;
 
         // Verifica Divisa de Estado
-        if (acumulador.uf && estadoAnterior && acumulador.uf !== estadoAnterior) {
+        if (ufAtual && estadoAnterior && ufAtual !== estadoAnterior) {
             html += `
-                <tr style="background: #eee; font-weight: bold; border-y: 1px solid #000;">
-                    <td style="padding: 5px;">${acumulador.uf}</td>
-                    <td colspan="3" style="padding: 5px; text-align: center;">---------------- DIVISA DE ESTADO ----------------</td>
+                <tr style="background: #eee; font-weight: bold; border-top: 1px solid #000; border-bottom: 1px solid #000;">
+                    <td style="padding: 5px;">${ufAtual}</td>
+                    <td colspan="3" style="padding: 5px; text-align: center; letter-spacing: 2px;">---------------- DIVISA DE ESTADO ----------------</td>
                     <td style="padding: 5px; text-align: right;">----------</td>
                 </tr>`;
         }
-        estadoAnterior = acumulador.uf;
+        estadoAnterior = ufAtual;
 
-        const kmFormatado = (acumulador.distancia / 1000).toFixed(1).replace('.', ',');
+        const kmFormatado = (distanciaAcumulada / 1000).toFixed(1).replace('.', ',');
         
         html += `
             <tr style="border-bottom: 1px solid #eee;">
-                <td style="padding: 10px;">${globalSeq++}</td>
-                <td style="padding: 10px;">${acumulador.cidade}</td>
-                <td style="padding: 10px; font-weight: bold; color: #1a56db;">${acumulador.via}</td>
-                <td style="padding: 10px;">${acumulador.descricao}</td>
-                <td style="padding: 10px; text-align: right; font-weight: bold;">${kmFormatado} km</td>
+                <td style="padding: 8px;">${globalSeq++}</td>
+                <td style="padding: 8px;">${cidadeAtual}</td>
+                <td style="padding: 8px; font-weight: bold; color: #1a56db;">${viaAtual}</td>
+                <td style="padding: 8px;">${instrucaoInicial}</td>
+                <td style="padding: 8px; text-align: right; font-weight: bold;">${kmFormatado} km</td>
             </tr>`;
     }
 
@@ -496,6 +500,7 @@ window.onload = () => {
     script.defer = true;
     document.head.appendChild(script);
 };
+
 
 
 
