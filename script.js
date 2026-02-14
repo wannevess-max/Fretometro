@@ -260,7 +260,7 @@ function calcularRota() {
     });
 }
 
-// --- IMPLEMENTAÇÃO DA TABELA DE 5 COLUNAS COM ALERTA DE ESTADO (FIX) ---
+// --- LOGICA DE TABELA DE 5 COLUNAS CORRIGIDA ---
 
 function processarSegmentosRota(res) {
     const legs = res.routes[0].legs;
@@ -294,43 +294,53 @@ function processarSegmentosRota(res) {
     legs.forEach((leg, legIndex) => {
         const isVazio = (temSaida && legIndex === 0);
         
+        // Tentar extrair Cidade e Estado do endereço do Google para cada trecho
+        const partesEnd = leg.start_address.split(',');
+        let cidadeUF = "Rota";
+        let ufAtual = "";
+
+        if (partesEnd.length >= 3) {
+            const trechoLocal = partesEnd[partesEnd.length - 3].trim();
+            cidadeUF = trechoLocal;
+            const ufMatch = trechoLocal.match(/\b([A-Z]{2})\b/);
+            ufAtual = ufMatch ? ufMatch[1] : "";
+        }
+
         leg.steps.forEach((step) => {
-            const instrucaoLimpa = step.instructions.replace(/<[^>]*>?/gm, '');
-            
-            // Extração Real de Cidade e UF (Melhorada)
-            // Tentamos extrair da instrução do Google ou do ponto de partida do Leg
-            const partesEnd = leg.start_address.split(',');
-            let cidadeUF = "Rota";
-            let ufAtual = "";
+            const instrucaoHTML = step.instructions;
+            const instrucaoLimpa = instrucaoHTML.replace(/<[^>]*>?/gm, '');
 
-            if (partesEnd.length >= 3) {
-                // Pega o penúltimo elemento que geralmente é "Cidade - UF"
-                const trechoLocal = partesEnd[partesEnd.length - 3].trim();
-                cidadeUF = trechoLocal;
-                const ufMatch = trechoLocal.match(/\b([A-Z]{2})\b/);
-                ufAtual = ufMatch ? ufMatch[1] : "";
-            }
-
-            // Lógica de Alerta de Mudança de Estado
+            // Lógica de Alerta de Mudança de Estado (Inserida apenas se houver mudança real)
             if (ufAtual && estadoAnterior && ufAtual !== estadoAnterior) {
                 html += `
-                    <tr style="background: #334155; color: #fff; font-weight: bold;">
+                    <tr style="background: #111; color: #fff; font-weight: bold;">
                         <td colspan="5" style="padding: 10px; text-align: center; letter-spacing: 2px;">
-                            ${ufAtual} ________________________________________________________________________________
+                            ESTADO DE ${ufAtual} _________________________________________________________________
                         </td>
                     </tr>`;
             }
             estadoAnterior = ufAtual;
 
-            // Extração da Referência (Via) - Busca por padrões como BR-XXX ou SP-XXX
-            const viaMatch = step.instructions.match(/\b([A-Z]{2}-\d{3,4})\b/) || step.instructions.match(/<b>(.*?)<\/b>/);
-            const referenciaVia = viaMatch ? viaMatch[1].replace(/<[^>]*>?/gm, '') : "Acesso";
+            // Extração da Referência (Via): Filtra para não pegar "Vire à esquerda"
+            // Prioridade: BR-XXX, SP-XXX ou o que estiver em negrito que não seja comando
+            let referenciaVia = "Acesso";
+            const viaMatch = instrucaoHTML.match(/\b([A-Z]{2}-\d{3,4})\b/);
+            const negritoMatch = instrucaoHTML.match(/<b>(.*?)<\/b>/);
+
+            if (viaMatch) {
+                referenciaVia = viaMatch[1];
+            } else if (negritoMatch) {
+                const bText = negritoMatch[1].replace(/<[^>]*>?/gm, '');
+                if (!/Vire|Mantenha|Siga|Curva|Saída/i.test(bText)) {
+                    referenciaVia = bText;
+                }
+            }
 
             html += `
                 <tr style="${isVazio ? 'background: rgba(251, 146, 60, 0.05);' : ''}">
-                    <td style="font-weight: bold; color: var(--text-sub);">${globalSeq}</td>
+                    <td style="font-weight: bold; color: #64748b;">${globalSeq}</td>
                     <td style="font-weight: 600; font-size: 11px;">${cidadeUF}</td>
-                    <td style="color: var(--accent); font-weight: bold;">${referenciaVia}</td>
+                    <td style="color: #2563eb; font-weight: bold;">${referenciaVia}</td>
                     <td style="font-size: 12px;">${instrucaoLimpa}</td>
                     <td style="text-align: right; font-weight: bold; font-size: 11px;">${step.distance.text}</td>
                 </tr>`;
@@ -343,7 +353,7 @@ function processarSegmentosRota(res) {
     const totalKm = ((distVazioMetros + distRotaMetros) / 1000).toFixed(1);
     html += `
         <div class="roteiro-footer">
-            <div style="color: var(--text-sub); font-size: 11px;">RELATÓRIO DE VIAGEM OPERACIONAL</div>
+            <div style="color: #64748b; font-size: 11px;">RELATÓRIO DE VIAGEM OPERACIONAL</div>
             <div style="font-size: 16px;">KILOMETRAGEM TOTAL: <strong>${totalKm} km</strong></div>
         </div>`;
 
@@ -442,7 +452,7 @@ function limparPainelCustos() {
 
 window.onload = () => {
     const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyClbY5ZvkjrMGP4nJmZzCcm4hUu5-fjZV0&libraries=places&callback=initApp`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=SUA_CHAVE&libraries=places&callback=initApp`;
     script.async = true;
     document.head.appendChild(script);
 };
