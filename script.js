@@ -130,75 +130,78 @@ function processarSegmentosRota(res) {
     
     if (!listaEscrita) return;
 
-    // Cabeçalho do Relatório
-    let html = `
-        <div style="padding: 20px; color: #1e293b; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
-            <div style="border-bottom: 2px solid #2563eb; padding-bottom: 10px; margin-bottom: 20px;">
-                <h3 style="margin:0; color: #2563eb;">Relatório Sintético de Rota</h3>
-                <small style="color: #64748b;">Baseado em dados do Google Maps</small>
-            </div>
-    `;
+    // FORÇAR LIMPEZA DA MENSAGEM "Calcule uma rota..."
+    listaEscrita.innerHTML = "";
+
+    let html = `<div style="padding: 15px; color: #1e293b; font-family: Arial, sans-serif;">`;
 
     legs.forEach((leg) => {
-        // Ponto de Partida
-        html += `
-            <div style="margin-bottom: 15px; font-weight: bold; font-size: 14px; display: flex; align-items: center; gap: 10px;">
-                <span style="background: #10b981; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 10px;">A</span>
-                ${leg.start_address}
-            </div>
-        `;
+        // Cidade de Início
+        html += `<div style="font-weight: bold; font-size: 16px; margin-bottom: 20px; color: #1a73e8;">${leg.start_address.split(',')[0]}</div>`;
 
         let resumoAgrupado = [];
         let itemAtual = null;
 
         leg.steps.forEach((step) => {
-            // Extraímos as rodovias principais (em negrito)
+            // Extrai as vias principais (tags <b>)
             const matches = step.instructions.match(/<b>(.*?)<\/b>/g) || [];
             const viaPrincipal = matches[0] ? matches[0].replace(/<[^>]*>?/gm, '') : "Vias locais";
 
-            // Se o trecho for longo ou continuar na mesma via, acumulamos (Igual ao resumo sintetico)
-            if (itemAtual && (itemAtual.via === viaPrincipal || step.distance.value < 15000)) {
+            // LÓGICA DE AGRUPAMENTO SINTÉTICO (Igual ao que o Google faz no painel lateral)
+            // Agrupamos se for a mesma via principal OU se o trecho for menor que 20km (manobras curtas)
+            if (itemAtual && (itemAtual.via === viaPrincipal || step.distance.value < 20000)) {
                 itemAtual.distancia += step.distance.value;
                 itemAtual.duracao += step.duration.value;
+                // Acumula as referências de via (ex: "via Rod. X, Rod Y")
+                matches.forEach(m => {
+                    let v = m.replace(/<[^>]*>?/gm, '');
+                    if(!itemAtual.viasMencionadas.includes(v)) itemAtual.viasMencionadas.push(v);
+                });
             } else {
                 if (itemAtual) resumoAgrupado.push(itemAtual);
                 itemAtual = {
                     via: viaPrincipal,
-                    instrucao: step.instructions.split('<div')[0], // Limpa avisos de trânsito
+                    viasMencionadas: [...new Set(matches.map(m => m.replace(/<[^>]*>?/gm, '')))],
                     distancia: step.distance.value,
-                    duracao: step.duration.value
+                    duracao: step.duration.value,
+                    instrucaoLimpa: step.instructions.split('<div')[0]
                 };
             }
         });
         if (itemAtual) resumoAgrupado.push(itemAtual);
 
-        // Renderização dos Itens do Resumo
+        // Gerar o HTML dos blocos sintéticos
         resumoAgrupado.forEach((bloco) => {
             const km = (bloco.distancia / 1000).toFixed(1).replace('.', ',');
             const horas = Math.floor(bloco.duracao / 3600);
             const minutos = Math.round((bloco.duracao % 3600) / 60);
-            const tempoStr = horas > 0 ? `${horas}h ${minutos}min` : `${minutos}min`;
+            const tempoStr = horas > 0 ? `${horas} h ${minutos} min` : `${minutos} min`;
+
+            // Montagem do texto: "Pegue a [Via Principal] via [Outras Vias]"
+            let textoExibicao = bloco.instrucaoLimpa;
+            if (bloco.viasMencionadas.length > 1) {
+                const extras = bloco.viasMencionadas.slice(1, 4).join(', ');
+                textoExibicao = `Siga pela <b>${bloco.via}</b> via ${extras}`;
+            }
 
             html += `
-                <div style="display: flex; gap: 15px; margin-bottom: 20px; border-left: 2px solid #e2e8f0; padding-left: 15px; margin-left: 11px;">
-                    <div style="flex-grow: 1;">
-                        <div style="font-size: 13px; color: #1e293b; margin-bottom: 4px; line-height: 1.5;">${bloco.instrucao}</div>
-                        <div style="font-size: 11px; color: #64748b; font-weight: 600;">${tempoStr} (${km} km)</div>
+                <div style="display: flex; gap: 15px; margin-bottom: 25px; align-items: flex-start;">
+                    <div style="color: #5f6368; font-size: 18px; padding-top: 2px;"></div>
+                    <div style="flex: 1;">
+                        <div style="font-size: 14px; color: #202124; line-height: 1.4;">${textoExibicao}</div>
+                        <div style="font-size: 13px; color: #70757a; margin-top: 4px;">${tempoStr} (${km} km)</div>
                     </div>
-                </div>
-            `;
+                </div>`;
         });
 
-        // Ponto de Chegada
-        html += `
-            <div style="margin-top: 10px; font-weight: bold; font-size: 14px; display: flex; align-items: center; gap: 10px;">
-                <span style="background: #ef4444; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 10px;">B</span>
-                ${leg.end_address}
-            </div>
-        `;
+        // Cidade de Destino
+        html += `<div style="font-weight: bold; font-size: 16px; margin-top: 10px; color: #1a73e8;">${leg.end_address.split(',')[0]}</div>`;
+        html += `<div style="font-size: 12px; color: #70757a; margin-bottom: 30px;">${leg.end_address.split(',').slice(1).join(',')}</div>`;
     });
 
     html += `</div>`;
+    
+    // INJETAR O CONTEÚDO NO PAINEL
     listaEscrita.innerHTML = html;
 
     if (typeof atualizarFinanceiro === "function") atualizarFinanceiro();
