@@ -290,12 +290,12 @@ function processarSegmentosRota(res) {
     let html = `
         <table class="tabela-roteiro" style="width:100%; border-collapse: collapse; font-family: Arial, sans-serif; font-size: 12px;">
             <thead>
-                <tr style="background: #f1f1f1; border-bottom: 1px solid #ccc;">
+                <tr style="background: #f1f1f1; border-bottom: 2px solid #333;">
                     <th style="width: 40px; padding: 8px; text-align: left;">Seq</th>
-                    <th style="width: 150px; padding: 8px; text-align: left;">Estrada / Cidade</th>
-                    <th style="width: 120px; padding: 8px; text-align: left;">Referência (Via)</th>
+                    <th style="width: 160px; padding: 8px; text-align: left;">Estrada / Cidade</th>
+                    <th style="width: 130px; padding: 8px; text-align: left;">Referência (Via)</th>
                     <th style="padding: 8px; text-align: left;">Nome do Trecho</th>
-                    <th style="width: 70px; padding: 8px; text-align: right;">KM</th>
+                    <th style="width: 80px; padding: 8px; text-align: right;">KM</th>
                 </tr>
             </thead>
             <tbody>`;
@@ -309,57 +309,69 @@ function processarSegmentosRota(res) {
         leg.steps.forEach((step) => {
             const instrucaoHTML = step.instructions;
             
-            // 1. Extração da CIDADE / UF do endereço do trecho
-            // O Google costuma mandar: "Rua X, Bairro, Cidade - UF, CEP, Brasil"
+            // 1. Extração Precisa de Cidade / UF (busca do fim para o começo do endereço)
             let cidadeUF = "Rota";
-            const partesEndereco = leg.start_address.split(',');
-            if (partesEndereco.length >= 3) {
-                const cidadeEstadoCru = partesEndereco[partesEndereco.length - 3].trim(); 
-                // Limpa números de CEP se houver e formata
-                cidadeUF = cidadeEstadoCru.replace(/\d{5}-\d{3}/, '').trim();
+            let ufAtual = "";
+            const partesEnd = leg.start_address.split(',');
+            if (partesEnd.length >= 2) {
+                // Pega a penúltima parte (geralmente Cidade - UF)
+                const localidade = partesEnd[partesEnd.length - 2].trim();
+                const ufMatch = localidade.match(/([A-Z]{2})$/); // Pega as duas letras no fim
+                
+                if (ufMatch) {
+                    ufAtual = ufMatch[1];
+                    // Remove o CEP se existir e formata
+                    cidadeUF = localidade.replace(/\d{5}-\d{3}/, '').trim();
+                    if (!cidadeUF.includes('/')) {
+                        cidadeUF = cidadeUF.replace('-', '/').trim();
+                    }
+                }
             }
 
-            // 2. Extração do ESTADO (UF) para a Divisa
-            const matchUF = leg.start_address.match(/\b([A-Z]{2})\b/);
-            let ufAtual = matchUF ? matchUF[1] : "";
-
-            // 3. Lógica da Linha de DIVISA DE ESTADO
+            // 2. Lógica da Linha de DIVISA DE ESTADO
             if (ufAtual && estadoAnterior && ufAtual !== estadoAnterior) {
                 html += `
-                    <tr style="background: #ffffff; font-weight: bold; border-top: 1px solid #000; border-bottom: 1px solid #000;">
+                    <tr style="background: #eee; font-weight: bold; border-top: 1px solid #000; border-bottom: 1px solid #000;">
                         <td style="padding: 5px;">${ufAtual}</td>
-                        <td colspan="3" style="padding: 5px; text-align: center;">-------------------------- DIVISA DE ESTADO --------------------------</td>
+                        <td colspan="3" style="padding: 5px; text-align: center; letter-spacing: 2px;">
+                            -------------------------- DIVISA DE ESTADO --------------------------
+                        </td>
                         <td style="padding: 5px; text-align: right;">----------</td>
                     </tr>`;
             }
             estadoAnterior = ufAtual;
 
-            // 4. Extração da VIA (Referência)
-            // Procura por padrões como BR-116, SP-330, Rod. Fernão Dias
-            let viaRef = "Urbano";
+            // 3. Extração da VIA (Referência)
+            let viaRef = "Acesso";
+            // Tenta achar siglas tipo BR-116 ou SP-330
             const viaSigla = instrucaoHTML.match(/\b([A-Z]{2}-\d{3})\b/);
+            
             if (viaSigla) {
                 viaRef = viaSigla[1];
             } else {
-                const bTag = instrucaoHTML.match(/<b>(.*?)<\/b>/);
-                if (bTag) {
-                    let txt = bTag[1].replace(/<[^>]*>?/gm, '');
-                    if (txt.length < 20 && !txt.includes("Vire") && !txt.includes("Mantenha")) {
-                        viaRef = txt;
+                // Se não achar sigla, busca nomes de rodovias em negrito
+                const bTags = instrucaoHTML.match(/<b>(.*?)<\/b>/g);
+                if (bTags) {
+                    for (let tag of bTags) {
+                        let txt = tag.replace(/<[^>]*>?/gm, '');
+                        if (txt.length > 2 && (txt.includes("Rod.") || txt.includes("Rodovia") || txt.includes("Av.") || txt.includes("Via"))) {
+                            viaRef = txt;
+                            break;
+                        }
                     }
                 }
             }
 
-            // 5. Nome do Trecho (Limpa o HTML da instrução)
+            // 4. Limpeza da Instrução Principal
             const instrucaoLimpa = instrucaoHTML.replace(/<[^>]*>?/gm, '');
 
             html += `
                 <tr style="border-bottom: 1px solid #eee; ${isVazio ? 'background: #fffbeb;' : ''}">
-                    <td style="padding: 6px;">${globalSeq}</td>
-                    <td style="padding: 6px;">${cidadeUF}</td>
-                    <td style="padding: 6px; font-weight: bold;">${viaRef}</td>
-                    <td style="padding: 6px;">${instrucaoLimpa}</td>
-                    <td style="padding: 6px; text-align: right; font-weight: bold;">${step.distance.text}</td>
+                    <td style="padding: 8px;">${globalSeq}</td>
+                    <td style="padding: 8px;">${cidadeUF}</td>
+                    <td style="padding: 8px; font-weight: bold; color: #1a56db;">${viaRef}</td>
+                    <td style="padding: 8px; color: #444;">${instrucaoLimpa}</td>
+                    <td style="padding: 8px; text-align: right; font-weight: bold;">${step.distance.text}</td>
                 </tr>`;
             globalSeq++;
         });
@@ -369,9 +381,9 @@ function processarSegmentosRota(res) {
     
     const totalKm = ((distVazioMetros + distRotaMetros) / 1000).toFixed(1);
     html += `
-        <div style="margin-top: 10px; padding: 10px; border-top: 2px solid #333; display: flex; justify-content: space-between; font-weight: bold;">
-            <span>RELATÓRIO DE VIAGEM OPERACIONAL</span>
-            <span>KILOMETRAGEM TOTAL: ${totalKm.replace('.', ',')} km</span>
+        <div style="margin-top: 15px; padding: 12px; border: 1px solid #ccc; background: #f9f9f9; display: flex; justify-content: space-between; font-weight: bold; font-family: sans-serif;">
+            <span style="color: #666;">RELATÓRIO DE VIAGEM OPERACIONAL</span>
+            <span style="font-size: 14px;">KILOMETRAGEM TOTAL: ${totalKm.replace('.', ',')} km</span>
         </div>`;
 
     if(listaEscrita) listaEscrita.innerHTML = html;
@@ -482,5 +494,6 @@ window.onload = () => {
     script.defer = true;
     document.head.appendChild(script);
 };
+
 
 
