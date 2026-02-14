@@ -267,7 +267,7 @@ function calcularRota() {
     const listaEscrita = document.getElementById("lista-passo-a-passo");
     const temSaida = document.getElementById("saida").value;
 
-    // Atualiza distâncias para os cálculos financeiros que já existem no seu código
+    // Mantém as variáveis globais de distância para não quebrar seus cálculos financeiros
     if (temSaida && legs.length >= 2) {
         distVazioMetros = legs[0].distance.value;
         distRotaMetros = legs.slice(1).reduce((acc, leg) => acc + leg.distance.value, 0);
@@ -277,14 +277,14 @@ function calcularRota() {
     }
 
     let html = `
-        <table class="tabela-roteiro" style="width:100%; border-collapse: collapse; font-family: sans-serif;">
+        <table class="tabela-roteiro" style="width:100%; border-collapse: collapse; min-width: 800px;">
             <thead>
-                <tr style="background: #f1f5f9; text-align: left;">
-                    <th style="width: 40px; padding: 8px; border-bottom: 2px solid #ddd;">Seq</th>
-                    <th style="width: 160px; padding: 8px; border-bottom: 2px solid #ddd;">Estrada / Cidade</th>
-                    <th style="width: 140px; padding: 8px; border-bottom: 2px solid #ddd;">Referência (Via)</th>
-                    <th style="padding: 8px; border-bottom: 2px solid #ddd;">Nome do Trecho</th>
-                    <th style="width: 70px; padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">KM</th>
+                <tr style="background: #f8fafc; border-bottom: 2px solid #e2e8f0;">
+                    <th style="width: 45px; padding: 10px; text-align: left;">Seq</th>
+                    <th style="width: 180px; padding: 10px; text-align: left;">Estrada / Cidade</th>
+                    <th style="width: 140px; padding: 10px; text-align: left;">Referência (Via)</th>
+                    <th style="padding: 10px; text-align: left;">Nome do Trecho</th>
+                    <th style="width: 85px; padding: 10px; text-align: right;">KM</th>
                 </tr>
             </thead>
             <tbody>`;
@@ -295,11 +295,10 @@ function calcularRota() {
     legs.forEach((leg, legIndex) => {
         const isVazio = (temSaida && legIndex === 0);
         
-        // Identificação de Cidade e Estado
+        // --- LÓGICA DE EXTRAÇÃO DE CIDADE ---
         const partesEnd = leg.start_address.split(',');
         let cidadeUF = "Rota";
         let ufAtual = "";
-
         if (partesEnd.length >= 3) {
             const trechoLocal = partesEnd[partesEnd.length - 3].trim();
             cidadeUF = trechoLocal;
@@ -311,45 +310,60 @@ function calcularRota() {
             const instrucaoHTML = step.instructions;
             const instrucaoLimpa = instrucaoHTML.replace(/<[^>]*>?/gm, '');
 
-            // Divisória de Estado (Apenas se mudar a UF)
+            // --- DIVISA DE ESTADO (LINHA DE DESTAQUE) ---
             if (ufAtual && estadoAnterior && ufAtual !== estadoAnterior) {
                 html += `
-                    <tr style="background: #0f172a; color: #ffffff; font-weight: bold;">
-                        <td colspan="5" style="padding: 10px; text-align: center; font-size: 12px; letter-spacing: 2px;">
-                            ENTRANDO EM: ${ufAtual} ——————————————————————————————————
+                    <tr style="background: #0f172a; color: white;">
+                        <td colspan="5" style="padding: 12px; text-align: center; font-weight: bold; font-size: 12px; letter-spacing: 2px;">
+                            DIVISA DE ESTADO: ENTRANDO EM ${ufAtual} ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬
                         </td>
                     </tr>`;
             }
             estadoAnterior = ufAtual;
 
-            // Extração da Via (Evitando comandos como "Vire" ou "Mantenha")
-            let viaRef = "Acesso";
+            // --- LÓGICA DE LIMPEZA DA COLUNA REFERÊNCIA ---
+            let viaRef = "Urbano";
             const viaSigla = instrucaoHTML.match(/\b([A-Z]{2}-\d{3,4})\b/); 
             const textoNegrito = instrucaoHTML.match(/<b>(.*?)<\/b>/);
 
             if (viaSigla) {
-                viaRef = viaSigla[1];
+                viaRef = viaSigla[1]; // Ex: BR-116, SP-330
             } else if (textoNegrito) {
                 const bText = textoNegrito[1].replace(/<[^>]*>?/gm, '');
-                // Filtro para não pegar direções na coluna de referência
-                if (!/Vire|Mantenha|Siga|Curva|Saída|Esquerda|Direita/i.test(bText)) {
+                // Filtro anti-poluição: não aceita comandos de direção como referência
+                const comandosProibidos = /Vire|Mantenha|Siga|Curva|Saída|Esquerda|Direita|Direção|ª/i;
+                if (!comandosProibidos.test(bText)) {
                     viaRef = bText;
                 }
             }
 
             html += `
-                <tr style="border-bottom: 1px solid #eee; ${isVazio ? 'background: #fffbeb;' : ''}">
-                    <td style="padding: 6px 8px; font-size: 11px; color: #666;">${globalSeq}</td>
-                    <td style="padding: 6px 8px; font-size: 11px; font-weight: 600;">${cidadeUF}</td>
-                    <td style="padding: 6px 8px; font-size: 11px; font-weight: bold; color: #2563eb;">${viaRef}</td>
-                    <td style="padding: 6px 8px; font-size: 12px;">${instrucaoLimpa}</td>
-                    <td style="padding: 6px 8px; font-size: 11px; font-weight: bold; text-align: right;">${step.distance.text}</td>
+                <tr style="border-bottom: 1px solid #f1f5f9; ${isVazio ? 'background: #fffbeb;' : ''}">
+                    <td style="padding: 8px; color: #94a3b8; font-size: 11px;">${globalSeq}</td>
+                    <td style="padding: 8px; font-weight: 600; font-size: 11px;">${cidadeUF}</td>
+                    <td style="padding: 8px; font-weight: bold; color: #2563eb; font-size: 11px;">${viaRef}</td>
+                    <td style="padding: 8px; font-size: 12px; color: #334155;">${instrucaoLimpa}</td>
+                    <td style="padding: 8px; font-weight: bold; text-align: right; font-size: 11px;">${step.distance.text}</td>
                 </tr>`;
             globalSeq++;
         });
     });
 
     html += `</tbody></table>`;
+    
+    // Rodapé da Tabela
+    const totalKm = ((distVazioMetros + distRotaMetros) / 1000).toFixed(1);
+    html += `
+        <div style="margin-top: 15px; padding: 15px; background: #f8fafc; border-top: 2px solid #cbd5e1; display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 11px; color: #64748b; font-weight: bold;">RELATÓRIO DE VIAGEM OPERACIONAL</span>
+            <span style="font-size: 18px; color: #1e293b;">DISTÂNCIA TOTAL: <strong>${totalKm.replace('.', ',')} km</strong></span>
+        </div>`;
+
+    listaEscrita.innerHTML = html;
+    
+    // Chama sua função original de cálculos financeiros
+    if (typeof atualizarFinanceiro === "function") atualizarFinanceiro();
+}
     
     // Mantém a chamada do financeiro original
     const totalKm = ((distVazioMetros + distRotaMetros) / 1000).toFixed(1);
@@ -458,5 +472,6 @@ window.onload = () => {
     script.async = true;
     document.head.appendChild(script);
 };
+
 
 
