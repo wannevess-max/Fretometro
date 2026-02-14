@@ -22,7 +22,6 @@ function toggleGoogleMaps() {
     const painel = document.getElementById('painel-roteiro-escrito');
     painel.classList.toggle('active');
     
-    // AJUSTE DINÂMICO: Força o mapa a recalcular o tamanho do container e centralizar a rota
     setTimeout(() => { 
         google.maps.event.trigger(map, "resize"); 
         if (directionsRenderer.getDirections()) {
@@ -261,7 +260,7 @@ function calcularRota() {
     });
 }
 
-// --- NOVO ROTEIRO RESUMIDO (ESTILO PÁGINA 2 PDF) ---
+// --- ROTEIRO DETALHADO POR LOGRADOURO (SOLICITADO) ---
 
 function processarSegmentosRota(res) {
     const legs = res.routes[0].legs;
@@ -276,40 +275,53 @@ function processarSegmentosRota(res) {
         distRotaMetros = legs.reduce((acc, leg) => acc + leg.distance.value, 0);
     }
 
-    // GERAÇÃO DA TABELA OPERACIONAL
     let html = `
-        <table style="width:100%; border-collapse: collapse; font-family: sans-serif; font-size: 12px; color: var(--text-main);">
+        <table class="tabela-roteiro">
             <thead>
-                <tr style="background: var(--border-color); text-align: left;">
-                    <th style="padding: 10px; border-bottom: 2px solid var(--accent);">SEQ</th>
-                    <th style="padding: 10px; border-bottom: 2px solid var(--accent);">TRECHO / CIDADE</th>
-                    <th style="padding: 10px; border-bottom: 2px solid var(--accent); text-align: right;">DISTÂNCIA</th>
+                <tr>
+                    <th>SEQ</th>
+                    <th>CIDADE/ESTADO</th>
+                    <th>NOME DO TRECHO / ESTRADA</th>
+                    <th style="text-align: right;">DISTÂNCIA</th>
                 </tr>
             </thead>
             <tbody>`;
 
-    legs.forEach((leg, index) => {
-        const isVazio = (temSaida && index === 0);
-        const seq = (index + 1).toString().padStart(2, '0');
-        const descInicio = leg.start_address.split(',')[0];
-        const descFim = leg.end_address.split(',')[0];
-        const corLinha = isVazio ? 'background: rgba(251, 146, 60, 0.1);' : '';
+    let globalSeq = 1;
+    
+    legs.forEach((leg, legIndex) => {
+        const isVazio = (temSaida && legIndex === 0);
+        
+        leg.steps.forEach((step) => {
+            // Extração do nome da via limpo (removendo tags HTML como <b>)
+            const viaLimpa = step.instructions.replace(/<[^>]*>?/gm, '');
+            
+            // Tentativa de extrair a cidade baseada nas coordenadas do step (simplificado via geocoder ou string address)
+            // Como o objeto step não traz "Cidade" pura, usamos o endereço de referência do Leg para o contexto
+            const refCidade = leg.end_address.split(',')[1] || "";
+            const estadoRef = leg.end_address.split(',')[2] || "";
 
-        html += `
-            <tr style="border-bottom: 1px solid var(--border-color); ${corLinha}">
-                <td style="padding: 10px; font-weight: bold; color: ${isVazio ? '#fb923c' : 'var(--accent)'}">${seq}</td>
-                <td style="padding: 10px;">
-                    <div style="font-size: 9px; color: var(--text-sub);">${isVazio ? 'DESLOCAMENTO VAZIO' : 'ROTA CARREGADA'}</div>
-                    <strong>${descInicio}</strong> ➔ <strong>${descFim}</strong>
-                </td>
-                <td style="padding: 10px; text-align: right; font-weight: bold;">${leg.distance.text}</td>
-            </tr>`;
+            html += `
+                <tr style="${isVazio ? 'background: rgba(251, 146, 60, 0.05);' : ''}">
+                    <td style="color: var(--text-sub); font-weight: bold;">${globalSeq.toString().padStart(2, '0')}</td>
+                    <td style="font-weight: 500;">${leg.start_address.split(',')[0]}</td>
+                    <td>
+                        <div style="font-size: 13px;">${viaLimpa}</div>
+                    </td>
+                    <td style="text-align: right; font-weight: bold; color: var(--accent);">${step.distance.text}</td>
+                </tr>`;
+            globalSeq++;
+        });
     });
 
     html += `</tbody></table>`;
     
     const totalKm = ((distVazioMetros + distRotaMetros) / 1000).toFixed(1);
-    html += `<div style="padding:15px; text-align:right; font-weight:bold; color:var(--text-sub);">DISTÂNCIA TOTAL: ${totalKm} km</div>`;
+    html += `
+        <div class="roteiro-footer">
+            <div style="color: var(--text-sub); font-size: 11px;">RELATÓRIO DE VIAGEM OPERACIONAL</div>
+            <div style="font-size: 16px;">KILOMETRAGEM TOTAL: <strong>${totalKm} km</strong></div>
+        </div>`;
 
     listaEscrita.innerHTML = html;
     atualizarFinanceiro();
