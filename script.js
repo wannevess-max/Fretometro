@@ -284,14 +284,13 @@ function processarSegmentosRota(res) {
     const listaEscrita = document.getElementById("lista-passo-a-passo");
     
     let html = `
-        <table class="tabela-roteiro" style="width:100%; border-collapse: collapse; font-family: Arial, sans-serif; font-size: 12px;">
+        <table class="tabela-roteiro" style="width:100%; border-collapse: collapse; font-family: Arial, sans-serif; font-size: 13px;">
             <thead>
                 <tr style="background: #f1f1f1; border-bottom: 2px solid #333;">
                     <th style="width: 40px; padding: 10px; text-align: left;">Seq</th>
-                    <th style="width: 200px; padding: 10px; text-align: left;">Estrada / Cidade</th>
-                    <th style="width: 140px; padding: 10px; text-align: left;">Referência (Via)</th>
-                    <th style="padding: 10px; text-align: left;">Nome do Trecho</th>
-                    <th style="width: 90px; padding: 10px; text-align: right;">KM</th>
+                    <th style="width: 220px; padding: 10px; text-align: left;">Destino / Trecho</th>
+                    <th style="width: 250px; padding: 10px; text-align: left;">Vias Utilizadas</th>
+                    <th style="width: 100px; padding: 10px; text-align: right;">Distância</th>
                 </tr>
             </thead>
             <tbody>`;
@@ -304,70 +303,72 @@ function processarSegmentosRota(res) {
         let grupoAtual = null;
 
         leg.steps.forEach((step) => {
-            const instrucaoHTML = step.instructions;
-            // Extrai o nome da via principal (geralmente na primeira tag <b>)
-            const bTags = instrucaoHTML.match(/<b>(.*?)<\/b>/g) || [];
-            const viaPrincipal = bTags[0] ? bTags[0].replace(/<[^>]*>?/gm, '') : "Acesso Local";
+            // O segredo do Google Maps: Ele agrupa steps que não possuem sub-steps complexos 
+            // ou quando a via principal se mantém por longas distâncias.
+            const instrucaoLimpa = step.instructions.replace(/<[^>]*>?/gm, '');
+            const viasNoStep = (step.instructions.match(/<b>(.*?)<\/b>/g) || [])
+                                .map(v => v.replace(/<[^>]*>?/gm, ''));
             
-            // Lógica de Agrupamento do Google:
-            // Se a via principal for a mesma, continuamos no mesmo grupo acumulando distância
-            if (grupoAtual && grupoAtual.via === viaPrincipal) {
+            const viaPrincipal = viasNoStep[0] || "Vias locais";
+
+            // Lógica de agrupamento para "Resumo de Viagem"
+            // Se a distância for curta (< 2km) e não for o primeiro passo, 
+            // tendemos a acumular no grupo anterior para evitar "sujeira" no relatório
+            if (grupoAtual && (grupoAtual.via === viaPrincipal || step.distance.value < 2000)) {
                 grupoAtual.distancia += step.distance.value;
-                grupoAtual.instrucaoFinal = instrucaoHTML; // Mantém a última instrução para pegar a cidade destino
+                if (!grupoAtual.viasAcumuladas.includes(viaPrincipal)) {
+                    grupoAtual.viasAcumuladas.push(viaPrincipal);
+                }
+                // Tenta capturar o último destino mencionado (ex: "em direção a Natal")
+                if (instrucaoLimpa.includes("direção") || instrucaoLimpa.includes("destino")) {
+                    grupoAtual.destino = instrucaoLimpa.split("direção a")[1] || instrucaoLimpa.split("destino")[1] || grupoAtual.destino;
+                }
             } else {
                 if (grupoAtual) gruposDeManobra.push(grupoAtual);
                 
                 grupoAtual = {
                     via: viaPrincipal,
+                    viasAcumuladas: [viaPrincipal],
                     distancia: step.distance.value,
-                    instrucaoInicial: instrucaoHTML,
-                    instrucaoFinal: instrucaoHTML,
-                    todasInstrucoes: instrucaoHTML
+                    instrucaoOriginal: step.instructions,
+                    destino: viasNoStep[viasNoStep.length - 1] || "Trajeto"
                 };
             }
         });
         if (grupoAtual) gruposDeManobra.push(grupoAtual);
 
-        // Renderiza os grupos (Exatamente como as linhas do resumo do Google)
+        // Renderização
         gruposDeManobra.forEach((grupo) => {
-            // Extração da Cidade/UF do Destino do Grupo (O que o Google mostra no resumo)
-            let cidadeUf = "Rota";
-            const tagsFinais = grupo.instrucaoFinal.match(/<b>(.*?)<\/b>/g) || [];
-            if (tagsFinais.length > 0) {
-                // O Google coloca o destino final do trecho na última ou penúltima tag b
-                let local = tagsFinais[tagsFinais.length - 1].replace(/<[^>]*>?/gm, '');
-                if (local.includes("-") || local.includes(",")) {
-                    cidadeUf = local;
-                } else if (tagsFinais.length >= 2) {
-                    cidadeUf = tagsFinais[tagsFinais.length - 2].replace(/<[^>]*>?/gm, '');
-                }
-            }
-
-            // Identifica UF para divisa
-            let ufMatch = cidadeUf.match(/([A-Z]{2})$/);
-            let ufAtual = ufMatch ? ufMatch[1] : "";
+            const km = (grupo.distancia / 1000).toFixed(1).replace('.', ',');
+            const listaVias = grupo.viasAcumuladas.join(' / ');
+            
+            // Lógica de Divisa de Estado simplificada (baseada no destino do trecho)
+            const ufMatch = grupo.destino.match(/([A-Z]{2})$/);
+            const ufAtual = ufMatch ? ufMatch[1] : "";
 
             if (ufAtual && estadoAnterior && ufAtual !== estadoAnterior) {
                 html += `
-                    <tr style="background: #f8f9fa; border-top: 1px solid #333; border-bottom: 1px solid #333;">
-                        <td style="padding: 5px; text-align: center; font-weight: bold;">${ufAtual}</td>
-                        <td colspan="3" style="padding: 5px; text-align: center; font-weight: bold; letter-spacing: 3px;">DIVISA DE ESTADO</td>
-                        <td style="padding: 5px; text-align: right; font-weight: bold;">---</td>
+                    <tr style="background: #e9ecef;">
+                        <td colspan="4" style="padding: 8px; text-align: center; font-weight: bold; font-size: 10px; color: #555;">
+                            ENTRADA NO ESTADO: ${ufAtual}
+                        </td>
                     </tr>`;
             }
             estadoAnterior = ufAtual || estadoAnterior;
 
-            // Formatação do Nome do Trecho (Resumo do Grupo)
-            const textoTrecho = grupo.instrucaoInicial.replace(/<[^>]*>?/gm, '');
-            const kmFormatado = (grupo.distancia / 1000).toFixed(1).replace('.', ',');
-
             html += `
                 <tr style="border-bottom: 1px solid #eee;">
-                    <td style="padding: 10px; color: #666;">${globalSeq++}</td>
-                    <td style="padding: 10px; font-weight: bold;">${cidadeUf}</td>
-                    <td style="padding: 10px; color: #1a56db; font-weight: bold;">${grupo.via}</td>
-                    <td style="padding: 10px; font-size: 11px;">${textoTrecho}</td>
-                    <td style="padding: 10px; text-align: right; font-weight: bold;">${kmFormatado} km</td>
+                    <td style="padding: 12px 10px; color: #888;">${globalSeq++}</td>
+                    <td style="padding: 12px 10px; font-weight: bold; color: #222;">
+                        ${grupo.destino.trim()}
+                    </td>
+                    <td style="padding: 12px 10px; color: #1a56db;">
+                        <small style="color: #666; display:block; font-size: 10px;">Siga por:</small>
+                        ${listaVias}
+                    </td>
+                    <td style="padding: 12px 10px; text-align: right; font-weight: bold; color: #000;">
+                        ${km} km
+                    </td>
                 </tr>`;
         });
     });
@@ -376,13 +377,12 @@ function processarSegmentosRota(res) {
     
     const totalMetros = legs.reduce((acc, l) => acc + l.distance.value, 0);
     html += `
-        <div style="margin-top: 20px; padding: 15px; border: 2px solid #333; display: flex; justify-content: space-between; align-items: center; background: #fff; font-weight: bold;">
-            <span>RELATÓRIO OPERACIONAL DE VIAGEM</span>
-            <span style="font-size: 16px;">DISTÂNCIA TOTAL: ${(totalMetros/1000).toFixed(1).replace('.', ',')} KM</span>
+        <div style="margin-top: 15px; padding: 20px; border: 1px solid #000; display: flex; justify-content: space-between; background: #fff;">
+            <span style="font-weight: bold;">RESUMO DO ROTEIRO DE VIAGEM</span>
+            <span style="font-size: 18px; font-weight: bold;">TOTAL: ${(totalMetros/1000).toFixed(0)} KM</span>
         </div>`;
 
     listaEscrita.innerHTML = html;
-    if (typeof atualizarFinanceiro === "function") atualizarFinanceiro();
 }
 function atualizarFinanceiro() {
     const kmVazio = distVazioMetros / 1000; 
@@ -489,6 +489,7 @@ window.onload = () => {
     script.defer = true;
     document.head.appendChild(script);
 };
+
 
 
 
