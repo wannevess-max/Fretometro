@@ -102,12 +102,12 @@
             </li>
         </ul>
 
-        <button class="btn-add" id="btnAddParada">+ Adicionar Parada</button>
+        <button class="btn-add" id="btnAddParada" onclick="adicionarParada()">+ Adicionar Parada</button>
 
         <div class="grid-configs">
             <div>
                 <label class="label-custo">VALOR POR KM</label>
-                <input id="valorPorKm" type="text" value="R$ 0,00">
+                <input id="valorPorKm" type="text" value="R$ 0,00" oninput="formatarMoeda(this)">
             </div>
             <div>
                 <label class="label-custo">ALÍQUOTA IMPOSTO</label>
@@ -128,7 +128,7 @@
             </div>
         </div>
 
-        <button class="calc-btn" id="btnCalcular">Calcular Rota</button>
+        <button class="calc-btn" id="btnCalcular" onclick="calcularRota()">Calcular Rota</button>
         <button class="btn-gestao" onclick="toggleCustos()">Painel de Custos (Extra)</button>
 
         <div class="financeiro">
@@ -170,7 +170,7 @@
         <div class="secao-custo">
             <label class="label-custo">Diesel</label>
             <div class="grid-configs no-margin">
-                <div><span class="sub-label">PREÇO/L</span><input type="text" id="custoDieselLitro" placeholder="R$ 0,00"></div>
+                <div><span class="sub-label">PREÇO/L</span><input type="text" id="custoDieselLitro" placeholder="R$ 0,00" oninput="formatarMoeda(this)"></div>
                 <div><span class="sub-label">MÉDIA KM/L</span><input type="number" id="consumoDieselMedia" placeholder="Ex: 2.5" step="0.1"></div>
             </div>
         </div>
@@ -178,7 +178,7 @@
         <div class="secao-custo">
             <label class="label-custo">Arla 32</label>
             <div class="grid-configs no-margin">
-                <div><span class="sub-label">PREÇO/L</span><input type="text" id="custoArlaLitro" placeholder="R$ 0,00"></div>
+                <div><span class="sub-label">PREÇO/L</span><input type="text" id="custoArlaLitro" placeholder="R$ 0,00" oninput="formatarMoeda(this)"></div>
                 <div><span class="sub-label">% DO DIESEL</span><input type="number" id="arlaPorcentagem" placeholder="Ex: 5" step="0.1"></div>
             </div>
         </div>
@@ -187,11 +187,11 @@
             <div class="grid-configs no-margin">
                 <div>
                     <label class="label-custo">Pedágios</label>
-                    <input type="text" id="custoPedagio" placeholder="Valor Total R$">
+                    <input type="text" id="custoPedagio" placeholder="Valor Total R$" oninput="formatarMoeda(this)">
                 </div>
                 <div>
                     <label class="label-custo">Manutenção (por KM)</label>
-                    <input type="text" id="custoManutencaoKm" placeholder="R$ 0,00 por KM">
+                    <input type="text" id="custoManutencaoKm" placeholder="R$ 0,00 por KM" oninput="formatarMoeda(this)">
                 </div>
             </div>
         </div>
@@ -253,6 +253,7 @@
                 <span id="txt-lucro-real">R$ 0,00</span>
             </div>
         </div>
+        <button class="calc-btn" onclick="toggleCustos()">Voltar ao Roteirizador</button>
     </div>
 
     <div class="map-container">
@@ -269,8 +270,7 @@
     </div>
 </div>
 
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyClbY5ZvkjrMGP4nJmZzCcm4hUu5-fjZV0&libraries=places"></script>
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyClbY5ZvkjrMGP4nJmZzCcm4hUu5-fjZV0&libraries=places&callback=initMap" async defer></script>
 <script src="script.js?v=1.0.2"></script>
 </body>
 </html>
-
