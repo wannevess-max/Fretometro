@@ -279,6 +279,7 @@ function processarSegmentosRota(res) {
     const listaEscrita = document.getElementById("lista-passo-a-passo");
     const temSaida = document.getElementById("saida").value;
 
+    // Cálculo de distâncias globais
     if (temSaida && legs.length >= 2) {
         distVazioMetros = legs[0].distance.value;
         distRotaMetros = legs.slice(1).reduce((acc, leg) => acc + leg.distance.value, 0);
@@ -288,92 +289,105 @@ function processarSegmentosRota(res) {
     }
 
     let html = `
-        <table class="tabela-roteiro" style="width:100%; border-collapse: collapse; font-family: Arial, sans-serif; font-size: 11px;">
+        <table class="tabela-roteiro" style="width:100%; border-collapse: collapse; font-family: Arial, sans-serif; font-size: 12px;">
             <thead>
                 <tr style="background: #f1f1f1; border-bottom: 2px solid #333;">
-                    <th style="width: 35px; padding: 6px; text-align: left;">Seq</th>
-                    <th style="width: 140px; padding: 6px; text-align: left;">Estrada / Cidade</th>
-                    <th style="width: 110px; padding: 6px; text-align: left;">Referência (Via)</th>
-                    <th style="padding: 6px; text-align: left;">Nome do Trecho</th>
-                    <th style="width: 65px; padding: 6px; text-align: right;">KM</th>
+                    <th style="width: 40px; padding: 10px; text-align: left;">Seq</th>
+                    <th style="width: 180px; padding: 10px; text-align: left;">Estrada / Cidade</th>
+                    <th style="width: 150px; padding: 10px; text-align: left;">Referência (Via)</th>
+                    <th style="padding: 10px; text-align: left;">Nome do Trecho</th>
+                    <th style="width: 90px; padding: 10px; text-align: right;">KM</th>
                 </tr>
             </thead>
             <tbody>`;
 
     let globalSeq = 1;
     let estadoAnterior = "";
+    
+    // Variáveis para Agrupamento (O segredo para não ter 1000 linhas)
+    let trechoAgrupado = null;
 
     legs.forEach((leg, legIndex) => {
         const isVazio = (temSaida && legIndex === 0);
         
-        // --- EXTRAÇÃO DA CIDADE BASE DO TRECHO ---
-        let cidadeTrecho = "Rota";
-        let ufTrecho = "";
+        // Extrai Cidade/UF do endereço final do trecho (mais preciso)
+        let cidadeUF = "Rota";
+        let ufAtual = "";
         const partesEnd = leg.start_address.split(',');
         if (partesEnd.length >= 2) {
             const localidade = partesEnd[partesEnd.length - 2].trim();
-            const ufMatch = localidade.match(/([A-Z]{2})$/);
-            if (ufMatch) {
-                ufTrecho = ufMatch[1];
-                cidadeTrecho = localidade.replace('-', '/').trim();
-            }
+            ufAtual = (localidade.match(/[A-Z]{2}$/) || [""])[0];
+            cidadeUF = localidade.replace('-', '/').trim();
         }
+
+        // Lógica de Divisa de Estado
+        if (ufAtual && estadoAnterior && ufAtual !== estadoAnterior) {
+            if (trechoAgrupado) renderizarLinha(); // Fecha o trecho anterior antes da divisa
+            html += `
+                <tr style="background: #e2e8f0; font-weight: bold; border-y: 1px solid #000;">
+                    <td style="padding: 5px;">${ufAtual}</td>
+                    <td colspan="3" style="padding: 5px; text-align: center;">---------------- DIVISA DE ESTADO ----------------</td>
+                    <td style="padding: 5px; text-align: right;">----------</td>
+                </tr>`;
+        }
+        estadoAnterior = ufAtual;
 
         leg.steps.forEach((step) => {
             const instrucaoHTML = step.instructions;
-
-            // --- LÓGICA DE DIVISA DE ESTADO ---
-            if (ufTrecho && estadoAnterior && ufTrecho !== estadoAnterior) {
-                html += `
-                    <tr style="background: #e2e8f0; font-weight: bold; border-top: 1px solid #000; border-bottom: 1px solid #000;">
-                        <td style="padding: 4px;">${ufTrecho}</td>
-                        <td colspan="3" style="padding: 4px; text-align: center; letter-spacing: 2px;">
-                            -------------------------- DIVISA DE ESTADO --------------------------
-                        </td>
-                        <td style="padding: 4px; text-align: right;">----------</td>
-                    </tr>`;
-            }
-            estadoAnterior = ufTrecho;
-
-            // --- EXTRAÇÃO DA VIA (REFERÊNCIA) ---
-            let viaRef = "Acesso";
+            
+            // Tenta identificar a Via (BR-116, SP-330, etc)
+            let viaIdentificada = "Acesso";
             const matchVia = instrucaoHTML.match(/\b([A-Z]{2}-\d{3})\b/);
             if (matchVia) {
-                viaRef = matchVia[1];
+                viaIdentificada = matchVia[1];
             } else {
-                const negritos = instrucaoHTML.match(/<b>(.*?)<\/b>/g);
-                if (negritos) {
-                    for (let n of negritos) {
-                        let texto = n.replace(/<[^>]*>?/gm, '');
-                        if (texto.length > 3 && (texto.includes("Rod.") || texto.includes("Rodovia") || texto.includes("Av."))) {
-                            viaRef = texto;
-                            break;
-                        }
-                    }
+                const bTag = instrucaoHTML.match(/<b>(.*?)<\/b>/);
+                if (bTag) {
+                    let txt = bTag[1].replace(/<[^>]*>?/gm, '');
+                    if (txt.includes("Rod.") || txt.includes("Rodovia") || txt.includes("Av.")) viaIdentificada = txt;
                 }
             }
 
-            const instrucaoLimpa = instrucaoHTML.replace(/<[^>]*>?/gm, '');
-
-            html += `
-                <tr style="border-bottom: 1px solid #eee; ${isVazio ? 'background: #fffbeb;' : ''}">
-                    <td style="padding: 6px;">${globalSeq}</td>
-                    <td style="padding: 6px;">${cidadeTrecho}</td>
-                    <td style="padding: 6px; font-weight: bold; color: #1a56db;">${viaRef}</td>
-                    <td style="padding: 6px; color: #444;">${instrucaoLimpa}</td>
-                    <td style="padding: 6px; text-align: right; font-weight: bold;">${step.distance.text}</td>
-                </tr>`;
-            globalSeq++;
+            // LÓGICA DE AGRUPAMENTO: Se estiver na mesma cidade e mesma via, apenas soma a distância
+            if (trechoAgrupado && trechoAgrupado.cidade === cidadeUF && trechoAgrupado.via === viaIdentificada) {
+                trechoAgrupado.distancia += step.distance.value;
+            } else {
+                if (trechoAgrupado) renderizarLinha(); // Imprime o trecho acumulado
+                
+                // Inicia um novo agrupamento
+                trechoAgrupado = {
+                    cidade: cidadeUF,
+                    via: viaIdentificada,
+                    nome: instrucaoHTML.replace(/<[^>]*>?/gm, ''),
+                    distancia: step.distance.value,
+                    vazio: isVazio
+                };
+            }
         });
     });
 
+    // Renderiza o último trecho que ficou na memória
+    if (trechoAgrupado) renderizarLinha();
+
+    function renderizarLinha() {
+        const kmTotalTrecho = (trechoAgrupado.distancia / 1000).toFixed(1).replace('.', ',');
+        html += `
+            <tr style="border-bottom: 1px solid #eee; ${trechoAgrupado.vazio ? 'background: #fffbeb;' : ''}">
+                <td style="padding: 8px;">${globalSeq++}</td>
+                <td style="padding: 8px;">${trechoAgrupado.cidade}</td>
+                <td style="padding: 8px; font-weight: bold; color: #1a56db;">${trechoAgrupado.via}</td>
+                <td style="padding: 8px;">${trechoAgrupado.nome}</td>
+                <td style="padding: 8px; text-align: right; font-weight: bold;">${kmTotalTrecho} km</td>
+            </tr>`;
+    }
+
     html += `</tbody></table>`;
     
-    const totalKm = ((distVazioMetros + distRotaMetros) / 1000).toFixed(1);
+    const totalKmGlobal = ((distVazioMetros + distRotaMetros) / 1000).toFixed(1).replace('.', ',');
     html += `
-        <div style="margin-top: 10px; padding: 10px; border: 1px solid #000; display: flex; justify-content: space-between; font-weight: bold;">
+        <div style="margin-top: 15px; padding: 10px; border: 2px solid #000; display: flex; justify-content: space-between; font-weight: bold;">
             <span>RELATÓRIO DE VIAGEM OPERACIONAL</span>
-            <span>KILOMETRAGEM TOTAL: ${totalKm.replace('.', ',')} km</span>
+            <span>TOTAL: ${totalKmGlobal} km</span>
         </div>`;
 
     if(listaEscrita) listaEscrita.innerHTML = html;
@@ -484,6 +498,7 @@ window.onload = () => {
     script.defer = true;
     document.head.appendChild(script);
 };
+
 
 
 
