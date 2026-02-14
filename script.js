@@ -260,7 +260,7 @@ function calcularRota() {
     });
 }
 
-// --- CORREÇÃO DA TABELA DETALHADA (LISTANDO RUA POR RUA) ---
+// --- IMPLEMENTAÇÃO DA TABELA DE 5 COLUNAS COM ALERTA DE ESTADO ---
 
 function processarSegmentosRota(res) {
     const legs = res.routes[0].legs;
@@ -281,31 +281,56 @@ function processarSegmentosRota(res) {
                 <tr>
                     <th>Seq</th>
                     <th>Estrada / Cidade</th>
+                    <th>Referência (Via)</th>
                     <th>Nome do Trecho</th>
-                    <th style="text-align: right;">Distância</th>
+                    <th style="text-align: right;">KM</th>
                 </tr>
             </thead>
             <tbody>`;
 
     let globalSeq = 1;
-    
+    let estadoAnterior = "";
+
     legs.forEach((leg, legIndex) => {
         const isVazio = (temSaida && legIndex === 0);
         
-        // Loop dentro de cada manobra (step) para pegar o logradouro real
         leg.steps.forEach((step) => {
             const instrucaoLimpa = step.instructions.replace(/<[^>]*>?/gm, '');
             
-            // Tenta extrair Cidade/UF do endereço formatado do Leg
+            // Extração de Cidade e Estado
             const partesEnd = leg.start_address.split(',');
-            const cidadeUF = partesEnd.length >= 3 ? partesEnd[partesEnd.length - 3].trim() : "Rota";
+            let cidadeUF = "Rota";
+            let ufAtual = "";
+
+            if (partesEnd.length >= 3) {
+                const trechoLocal = partesEnd[partesEnd.length - 3].trim();
+                cidadeUF = trechoLocal;
+                const ufMatch = trechoLocal.match(/\b([A-Z]{2})\b/);
+                ufAtual = ufMatch ? ufMatch[1] : "";
+            }
+
+            // Lógica de Alerta de Mudança de Estado
+            if (ufAtual && estadoAnterior && ufAtual !== estadoAnterior) {
+                html += `
+                    <tr style="background: #334155; color: #fff; font-weight: bold;">
+                        <td colspan="5" style="padding: 10px; text-align: center; letter-spacing: 2px;">
+                            ${ufAtual} ________________________________________________________________________________
+                        </td>
+                    </tr>`;
+            }
+            estadoAnterior = ufAtual;
+
+            // Extração da Referência (Via) - Busca por padrões como BR-XXX ou SP-XXX
+            const viaMatch = step.instructions.match(/\b([A-Z]{2}-\d{3})\b/) || step.instructions.match(/<b>(.*?)<\/b>/);
+            const referenciaVia = viaMatch ? viaMatch[1].replace(/<[^>]*>?/gm, '') : "Acesso";
 
             html += `
                 <tr style="${isVazio ? 'background: rgba(251, 146, 60, 0.05);' : ''}">
                     <td style="font-weight: bold; color: var(--text-sub);">${globalSeq}</td>
                     <td style="font-weight: 600; font-size: 11px;">${cidadeUF}</td>
+                    <td style="color: var(--accent); font-weight: bold;">${referenciaVia}</td>
                     <td style="font-size: 12px;">${instrucaoLimpa}</td>
-                    <td style="text-align: right; font-weight: bold; color: var(--accent); font-size: 11px;">${step.distance.text}</td>
+                    <td style="text-align: right; font-weight: bold; font-size: 11px;">${step.distance.text}</td>
                 </tr>`;
             globalSeq++;
         });
@@ -331,7 +356,7 @@ function atualizarFinanceiro() {
     const kmRota = distRotaMetros / 1000; 
     const kmTotal = kmVazio + kmRota;
     const vKmRota = converterParaFloat(document.getElementById("valorPorKm").value);
-    const divisor = parseFloat(document.getElementById("imposto").value);
+    const divisor = parseFloat(document.getElementById("imposto").value) || 1;
     const tipoDesl = document.getElementById("tipoDeslocamento").value;
     
     let freteBase = kmRota * vKmRota; 
