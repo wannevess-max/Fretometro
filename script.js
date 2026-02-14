@@ -31,7 +31,6 @@ function salvarVeiculo() {
     if(idx === -1) frota.push(v); else frota[idx] = v;
     localStorage.setItem('frota_db', JSON.stringify(frota));
     
-    // Reset campos
     document.getElementById('f-nome').value = ''; 
     document.getElementById('f-consumo').value = '';
     document.getElementById('f-manut').value = '';
@@ -166,16 +165,11 @@ function initApp() {
     };
 
     const inputMoedas = ["valorPorKm", "valorDeslocamentoKm", "valorDeslocamentoTotal", "custoDieselLitro", "custoPedagio", "custoManutencaoKm", "custoArlaLitro"];
-    
     inputMoedas.forEach(id => {
         const el = document.getElementById(id); 
-        if(el) el.oninput = () => { 
-            formatarMoeda(el); 
-            atualizarFinanceiro(); 
-        };
+        if(el) el.oninput = () => { formatarMoeda(el); atualizarFinanceiro(); };
     });
 
-    // Inputs que não são moeda mas afetam o financeiro
     ["consumoDieselMedia", "arlaPorcentagem", "consumoFrioHora", "prevColeta", "prevEntrega"].forEach(id => {
         const el = document.getElementById(id);
         if(el) el.oninput = atualizarFinanceiro;
@@ -190,7 +184,6 @@ function initApp() {
     });
 
     updateSelects();
-
     const estadoSalvo = localStorage.getItem('painelCustosEstado');
     if (estadoSalvo) document.getElementById('painel-custos-extra').style.display = estadoSalvo;
 }
@@ -225,16 +218,13 @@ function adicionarCampoParada() {
 function calcularRota() {
     const inputs = Array.from(document.querySelectorAll("#lista-pontos li input[type='text']"));
     const ids = inputs.map(i => paradasData[i.id]).filter(id => id);
-    
     if (ids.length < 2) return;
-    
     const request = { 
         origin: { placeId: ids[0] }, 
         destination: { placeId: ids[ids.length - 1] }, 
         waypoints: ids.slice(1, -1).map(id => ({ location: { placeId: id }, stopover: true })), 
         travelMode: google.maps.TravelMode.DRIVING 
     };
-    
     directionsService.route(request, (res, status) => { 
         if (status === "OK") { 
             directionsRenderer.setDirections(res); 
@@ -246,7 +236,9 @@ function calcularRota() {
 
 function processarSegmentosRota(res) {
     const legs = res.routes[0].legs;
+    const listaEscrita = document.getElementById("lista-passo-a-passo");
     const temSaida = document.getElementById("saida").value;
+
     if (temSaida && legs.length >= 2) {
         distVazioMetros = legs[0].distance.value;
         distRotaMetros = legs.slice(1).reduce((acc, leg) => acc + leg.distance.value, 0);
@@ -254,6 +246,35 @@ function processarSegmentosRota(res) {
         distVazioMetros = 0;
         distRotaMetros = legs.reduce((acc, leg) => acc + leg.distance.value, 0);
     }
+
+    // GERAR ROTEIRO ESCRITO
+    let htmlRoteiro = "";
+    legs.forEach((leg, index) => {
+        const isVazio = (temSaida && index === 0);
+        const corHeader = isVazio ? "#fb923c" : "#2563eb";
+        const label = isVazio ? "DESLOCAMENTO VAZIO" : `TRECHO ${index + (temSaida ? 0 : 1)}`;
+
+        htmlRoteiro += `
+            <div style="margin-top: 20px;">
+                <h3 style="color: ${corHeader}; font-size: 14px; margin-bottom: 5px; border-bottom: 1px solid var(--border-color); padding-bottom: 5px;">
+                    ${label}: ${leg.start_address.split(',')[0]} ➔ ${leg.end_address.split(',')[0]}
+                </h3>
+                <p style="font-size: 11px; color: var(--text-sub); margin-bottom: 10px;">
+                    Distância: ${leg.distance.text} | Tempo est.: ${leg.duration.text}
+                </p>
+        `;
+        leg.steps.forEach(step => {
+            htmlRoteiro += `
+                <div class="adp-substep">
+                    <span class="adp-distance">${step.distance.text}</span>
+                    <span class="adp-instructions">${step.instructions}</span>
+                </div>
+            `;
+        });
+        htmlRoteiro += `</div>`;
+    });
+
+    listaEscrita.innerHTML = htmlRoteiro || "<p>Calcule uma rota para visualizar o roteiro.</p>";
     atualizarFinanceiro();
 }
 
@@ -277,10 +298,8 @@ function atualizarFinanceiro() {
     let baseCalculoParaImposto = freteBase + valorDeslocamento;
     const freteTotalComImposto = baseCalculoParaImposto / divisor;
     const valorDoImposto = freteTotalComImposto - baseCalculoParaImposto;
-
     const opt = { minimumFractionDigits: 2, maximumFractionDigits: 2 };
 
-    // Update UI principal
     document.getElementById("txt-km-vazio-det").innerText = kmVazio.toFixed(1) + " km";
     document.getElementById("txt-km-rota-det").innerText = kmRota.toFixed(1) + " km";
     document.getElementById("txt-km-total").innerText = kmTotal.toFixed(1) + " km";
@@ -289,11 +308,9 @@ function atualizarFinanceiro() {
     document.getElementById("txt-valor-imp").innerText = "R$ " + valorDoImposto.toLocaleString('pt-BR', opt);
     document.getElementById("txt-frete-total").innerText = "R$ " + freteTotalComImposto.toLocaleString('pt-BR', opt);
 
-    // Update Painel Extra
     document.getElementById("txt-an-frete-liquido").innerText = "R$ " + freteTotalComImposto.toLocaleString('pt-BR', opt);
     document.getElementById("txt-an-imposto").innerText = "R$ " + valorDoImposto.toLocaleString('pt-BR', opt);
 
-    // Custos
     const precoDiesel = converterParaFloat(document.getElementById("custoDieselLitro").value);
     const consumoDiesel = parseFloat(document.getElementById("consumoDieselMedia").value) || 0;
     const precoArla = converterParaFloat(document.getElementById("custoArlaLitro").value);
@@ -310,27 +327,11 @@ function atualizarFinanceiro() {
         const consFrio = parseFloat(document.getElementById("consumoFrioHora").value) || 0;
         const pColetaStr = document.getElementById("prevColeta").value;
         const pEntregaStr = document.getElementById("prevEntrega").value;
-        
-        const alertDatasFrio = document.getElementById("alerta-datas-frio");
-        const alertErroDatas = document.getElementById("alerta-erro-datas");
-
-        if (!pColetaStr || !pEntregaStr) {
-            alertDatasFrio.style.display = "block";
-            alertErroDatas.style.display = "none";
-        } else {
-            const pColeta = new Date(pColetaStr);
-            const pEntrega = new Date(pEntregaStr);
-            if (pEntrega <= pColeta) {
-                alertDatasFrio.style.display = "none";
-                alertErroDatas.style.display = "block";
-            } else {
-                alertDatasFrio.style.display = "none";
-                alertErroDatas.style.display = "none";
-                const horas = Math.abs(pEntrega - pColeta) / 36e5;
-                custoFrioTotal = horas * consFrio * precoDiesel;
-                document.getElementById("row-an-frio").style.display = "flex";
-                document.getElementById("txt-an-frio").innerText = "R$ " + custoFrioTotal.toLocaleString('pt-BR', opt);
-            }
+        if (pColetaStr && pEntregaStr) {
+            const horas = Math.abs(new Date(pEntregaStr) - new Date(pColetaStr)) / 36e5;
+            custoFrioTotal = horas * consFrio * precoDiesel;
+            document.getElementById("row-an-frio").style.display = "flex";
+            document.getElementById("txt-an-frio").innerText = "R$ " + custoFrioTotal.toLocaleString('pt-BR', opt);
         }
     } else {
         document.getElementById("row-an-frio").style.display = "none";
@@ -345,23 +346,18 @@ function atualizarFinanceiro() {
     document.getElementById("txt-an-manut").innerText = "R$ " + custoManutTotal.toLocaleString('pt-BR', opt);
     document.getElementById("txt-total-custos").innerText = "R$ " + totalCustos.toLocaleString('pt-BR', opt);
     document.getElementById("txt-lucro-real").innerText = "R$ " + lucroReal.toLocaleString('pt-BR', opt);
+    document.getElementById("txt-lucro-real").style.color = (lucroReal < 0) ? "#ef4444" : "#16a34a";
 
-    const txtLucro = document.getElementById("txt-lucro-real");
-    txtLucro.style.color = (lucroReal < 0) ? "#ef4444" : "#16a34a";
-
-    // Barra Visual
     const pVazio = kmTotal > 0 ? (kmVazio / kmTotal * 100) : 0;
     document.getElementById("visual-vazio").style.width = pVazio + "%";
     document.getElementById("perc-vazio").innerText = pVazio.toFixed(1) + "%";
     document.getElementById("perc-rota").innerText = (100 - pVazio).toFixed(1) + "%";
-    
     const rKmReal = kmTotal > 0 ? ((freteBase + valorDeslocamento) / kmTotal) : 0;
     document.getElementById("txt-km-real").innerText = "R$ " + rKmReal.toLocaleString('pt-BR', opt);
 }
 
 function limparPainelCustos() {
-    const ids = ["custoDieselLitro", "consumoDieselMedia", "custoArlaLitro", "arlaPorcentagem", "custoPedagio", "custoManutencaoKm", "consumoFrioHora", "prevColeta", "prevEntrega"];
-    ids.forEach(id => {
+    ["custoDieselLitro", "consumoDieselMedia", "custoArlaLitro", "arlaPorcentagem", "custoPedagio", "custoManutencaoKm", "consumoFrioHora", "prevColeta", "prevEntrega"].forEach(id => {
         const el = document.getElementById(id); if(el) el.value = "";
     });
     document.getElementById("selFrotaVinculo").value = "";
@@ -370,33 +366,9 @@ function limparPainelCustos() {
 }
 
 function toggleGoogleMaps() {
-    const painel = document.getElementById('painel-google-maps');
-    const container = document.getElementById('container-iframe-maps');
-    const ori = document.getElementById('origem').value;
-    const dest = document.getElementById('destino').value;
-
-    if (!painel.classList.contains('active')) {
-        if (!ori || !dest) {
-            alert("Preencha Origem e Destino primeiro!");
-            return;
-        }
-        
-        // Coleta paradas extras se houver
-        const paradasExtras = Array.from(document.querySelectorAll("#lista-pontos li input"))
-            .filter(i => i.id !== 'saida' && i.id !== 'origem' && i.id !== 'destino' && i.value)
-            .map(i => i.value)
-            .join('|');
-
-        const key = "AIzaSyClbY5ZvkjrMGP4nJmZzCcm4hUu5-fjZV0";
-        let url = `https://www.google.com/maps/embed/v1/directions?key=${key}&origin=${encodeURIComponent(ori)}&destination=${encodeURIComponent(dest)}`;
-        if(paradasExtras) url += `&waypoints=${encodeURIComponent(paradasExtras)}`;
-
-        container.innerHTML = `<iframe src="${url}" allowfullscreen></iframe>`;
-        painel.classList.add('active');
-    } else {
-        painel.classList.remove('active');
-        container.innerHTML = "";
-    }
+    const painel = document.getElementById('painel-roteiro-escrito');
+    painel.classList.toggle('active');
+    setTimeout(() => { google.maps.event.trigger(map, "resize"); }, 400);
 }
 
 window.onload = () => {
