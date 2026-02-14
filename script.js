@@ -31,7 +31,7 @@ function toggleGoogleMaps() {
     }, 400);
 }
 
-// --- GESTÃO DE FROTA (MANTIDO) ---
+// --- GESTÃO DE FROTA ---
 
 function salvarVeiculo() {
     const idx = parseInt(document.getElementById('f-edit-index').value);
@@ -260,7 +260,7 @@ function calcularRota() {
     });
 }
 
-// --- ROTEIRO DETALHADO POR LOGRADOURO (SOLICITADO) ---
+// --- NOVO ROTEIRO DETALHADO (PASSO A PASSO OPERACIONAL) ---
 
 function processarSegmentosRota(res) {
     const legs = res.routes[0].legs;
@@ -279,10 +279,10 @@ function processarSegmentosRota(res) {
         <table class="tabela-roteiro">
             <thead>
                 <tr>
-                    <th>SEQ</th>
-                    <th>CIDADE/ESTADO</th>
-                    <th>NOME DO TRECHO / ESTRADA</th>
-                    <th style="text-align: right;">DISTÂNCIA</th>
+                    <th style="width: 40px;">Seq</th>
+                    <th style="width: 200px;">Estrada / Cidade</th>
+                    <th>Nome do Trecho</th>
+                    <th style="text-align: right; width: 80px;">Dist.</th>
                 </tr>
             </thead>
             <tbody>`;
@@ -293,22 +293,20 @@ function processarSegmentosRota(res) {
         const isVazio = (temSaida && legIndex === 0);
         
         leg.steps.forEach((step) => {
-            // Extração do nome da via limpo (removendo tags HTML como <b>)
-            const viaLimpa = step.instructions.replace(/<[^>]*>?/gm, '');
+            // Limpa as instruções HTML e foca no nome da via
+            let instrucaoLimpa = step.instructions.replace(/<[^>]*>?/gm, '');
             
-            // Tentativa de extrair a cidade baseada nas coordenadas do step (simplificado via geocoder ou string address)
-            // Como o objeto step não traz "Cidade" pura, usamos o endereço de referência do Leg para o contexto
-            const refCidade = leg.end_address.split(',')[1] || "";
-            const estadoRef = leg.end_address.split(',')[2] || "";
+            // Extração de Cidade/Estado baseada no endereço do Leg (contexto local)
+            let partesEndereco = leg.start_address.split(',');
+            let cidadeContexto = partesEndereco.length > 1 ? partesEndereco[partesEndereco.length - 3].trim() : "Rota";
+            let estadoContexto = partesEndereco.length > 1 ? partesEndereco[partesEndereco.length - 2].trim().split(' ')[0] : "";
 
             html += `
                 <tr style="${isVazio ? 'background: rgba(251, 146, 60, 0.05);' : ''}">
-                    <td style="color: var(--text-sub); font-weight: bold;">${globalSeq.toString().padStart(2, '0')}</td>
-                    <td style="font-weight: 500;">${leg.start_address.split(',')[0]}</td>
-                    <td>
-                        <div style="font-size: 13px;">${viaLimpa}</div>
-                    </td>
-                    <td style="text-align: right; font-weight: bold; color: var(--accent);">${step.distance.text}</td>
+                    <td style="font-weight: bold; color: var(--text-sub);">${globalSeq}</td>
+                    <td style="font-weight: 600; font-size: 11px;">${cidadeContexto}/${estadoContexto}</td>
+                    <td style="font-size: 12px;">${instrucaoLimpa}</td>
+                    <td style="text-align: right; font-weight: bold; color: var(--accent); font-size: 11px;">${step.distance.text}</td>
                 </tr>`;
             globalSeq++;
         });
@@ -317,17 +315,13 @@ function processarSegmentosRota(res) {
     html += `</tbody></table>`;
     
     const totalKm = ((distVazioMetros + distRotaMetros) / 1000).toFixed(1);
-    html += `
-        <div class="roteiro-footer">
-            <div style="color: var(--text-sub); font-size: 11px;">RELATÓRIO DE VIAGEM OPERACIONAL</div>
-            <div style="font-size: 16px;">KILOMETRAGEM TOTAL: <strong>${totalKm} km</strong></div>
-        </div>`;
+    html += `<div class="roteiro-footer">Total da Viagem: <strong>${totalKm} km</strong></div>`;
 
     listaEscrita.innerHTML = html;
     atualizarFinanceiro();
 }
 
-// --- CÁLCULOS FINANCEIROS (MANTIDO) ---
+// --- CÁLCULOS FINANCEIROS (MANTIDO INTEGRAL) ---
 
 function atualizarFinanceiro() {
     const kmVazio = distVazioMetros / 1000; 
