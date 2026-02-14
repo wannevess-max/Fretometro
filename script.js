@@ -274,126 +274,87 @@ function calcularRota() {
     });
 }
 
+/**
+ * Processa a rota para gerar o resumo de "Longa Distância"
+ * focado em grandes trechos e cidades de passagem.
+ */
 function processarSegmentosRota(res) {
-    const legs = res.routes[0].legs;
+    const route = res.routes[0];
+    const legs = route.legs;
     const listaEscrita = document.getElementById("lista-passo-a-passo");
     
-    distVazioMetros = 0;
-    distRotaMetros = 0;
+    let distRotaMetros = 0;
+    legs.forEach(l => distRotaMetros += l.distance.value);
 
     let html = `
-        <table class="tabela-roteiro" style="width:100%; border-collapse: collapse; font-family: Arial, sans-serif; font-size: 12px;">
-            <thead>
-                <tr style="background: #f1f1f1; border-bottom: 2px solid #333;">
-                    <th style="width: 40px; padding: 10px; text-align: left;">Seq</th>
-                    <th style="width: 180px; padding: 10px; text-align: left;">Estrada / Cidade</th>
-                    <th style="width: 130px; padding: 10px; text-align: left;">Referência (Via)</th>
-                    <th style="padding: 10px; text-align: left;">Nome do Trecho</th>
-                    <th style="width: 90px; padding: 10px; text-align: right;">KM</th>
-                </tr>
-            </thead>
-            <tbody>`;
+        <div style="font-family: 'Google Sans', Roboto, Arial, sans-serif; color: #3c4043; padding: 20px; background: #fff;">
+            <div style="font-size: 18px; margin-bottom: 8px; font-weight: 500;">${legs[0].start_address.split(',')[0]}</div>
+            <div style="font-size: 14px; color: #70757a; margin-bottom: 20px;">${legs[0].start_address}</div>
+            
+            <table style="width: 100%; border-collapse: collapse;">
+                <tbody>`;
 
     let globalSeq = 1;
-    let estadoAnterior = "";
-    
-    // Variáveis para controlar o agrupamento
-    let cidadeAtual = "";
-    let viaAtual = "";
-    let distanciaAcumulada = 0;
-    let instrucaoInicial = "";
-    let ufAtual = "";
 
     legs.forEach((leg) => {
-        distRotaMetros += leg.distance.value;
+        // No Google Maps, os trechos resumidos que você vê no HTML 
+        // são extraídos dos 'steps' que possuem distâncias consideráveis.
+        leg.steps.forEach((step) => {
+            const instrucaoRaw = step.instructions;
+            const distanciaTexto = step.distance.text;
+            const tempoTexto = step.duration.text;
+            const distanciaMetros = step.distance.value;
 
-        leg.steps.forEach((step, index) => {
-            const instrucaoHTML = step.instructions;
-            const textoLimpo = instrucaoHTML.replace(/<[^>]*>?/gm, '');
+            // FILTRO: Só mostramos no resumo trechos maiores que 2km 
+            // OU trechos que mencionam explicitamente Rodovias (BR, SP, Rod.)
+            const ehRodovia = /Rod\.|Rodovia|BR-|SP-|BA-/.test(instrucaoRaw);
+            
+            if (distanciaMetros > 2000 || ehRodovia) {
+                // Limpeza de tags HTML das instruções do Google
+                const instrucaoLimpa = instrucaoRaw.replace(/<[^>]*>?/gm, '');
 
-            // 1. Identifica a Via (Sigla ou nome em negrito)
-            let viaNoPasso = "Acesso";
-            const viaSigla = instrucaoHTML.match(/\b([A-Z]{2}-\d{3})\b/);
-            if (viaSigla) {
-                viaNoPasso = viaSigla[1];
-            } else {
-                const bTag = instrucaoHTML.match(/<b>(.*?)<\/b>/);
-                if (bTag) {
-                    let txt = bTag[1].replace(/<[^>]*>?/gm, '');
-                    if (txt.includes("Rod.") || txt.includes("Rodovia") || txt.includes("Av.")) viaNoPasso = txt;
-                }
-            }
-
-            // 2. Tenta pegar a cidade aproximada através da instrução (O Google costuma citar a cidade em trechos longos)
-            // Caso não ache, mantém a cidade do leg
-            let cidadeNoPasso = leg.start_address.split(',')[2]?.trim().replace('-', '/') || "Rota";
-            let ufNoPasso = (cidadeNoPasso.match(/[A-Z]{2}$/) || [""])[0];
-
-            // 3. Lógica de QUEBRA: Se mudou a via ou a cidade, imprime o que acumulou e começa novo
-            if (index === 0 && !viaAtual) {
-                // Primeiro passo da viagem
-                viaAtual = viaNoPasso;
-                cidadeAtual = cidadeNoPasso;
-                ufAtual = ufNoPasso;
-                instrucaoInicial = textoLimpo;
-                distanciaAcumulada = step.distance.value;
-            } else if (viaNoPasso !== viaAtual || (step.distance.value > 5000 && cidadeNoPasso !== cidadeAtual)) {
-                // Imprime a linha acumulada
-                renderizarLinha();
-
-                // Reinicia acumuladores para o novo trecho
-                viaAtual = viaNoPasso;
-                cidadeAtual = cidadeNoPasso;
-                ufAtual = ufNoPasso;
-                instrucaoInicial = textoLimpo;
-                distanciaAcumulada = step.distance.value;
-            } else {
-                // Continua na mesma via/cidade: apenas soma distância
-                distanciaAcumulada += step.distance.value;
+                html += `
+                    <tr>
+                        <td style="vertical-align: top; padding: 15px 0; width: 30px;">
+                            <span style="color: #70757a;"></span>
+                        </td>
+                        <td style="padding: 15px 0; border-bottom: 1px solid #e9ecef;">
+                            <div style="font-size: 14px; line-height: 1.5; color: #202124;">
+                                <strong>${instrucaoLimpa}</strong>
+                            </div>
+                            <div style="font-size: 13px; color: #70757a; margin-top: 4px;">
+                                ${tempoTexto} (${distanciaTexto})
+                            </div>
+                        </td>
+                    </tr>`;
             }
         });
     });
 
-    // Renderiza o último trecho
-    renderizarLinha();
-
-    function renderizarLinha() {
-        if (distanciaAcumulada <= 0) return;
-
-        // Verifica Divisa de Estado
-        if (ufAtual && estadoAnterior && ufAtual !== estadoAnterior) {
-            html += `
-                <tr style="background: #eee; font-weight: bold; border-top: 1px solid #000; border-bottom: 1px solid #000;">
-                    <td style="padding: 5px;">${ufAtual}</td>
-                    <td colspan="3" style="padding: 5px; text-align: center; letter-spacing: 2px;">---------------- DIVISA DE ESTADO ----------------</td>
-                    <td style="padding: 5px; text-align: right;">----------</td>
-                </tr>`;
-        }
-        estadoAnterior = ufAtual;
-
-        const kmFormatado = (distanciaAcumulada / 1000).toFixed(1).replace('.', ',');
-        
-        html += `
-            <tr style="border-bottom: 1px solid #eee;">
-                <td style="padding: 8px;">${globalSeq++}</td>
-                <td style="padding: 8px;">${cidadeAtual}</td>
-                <td style="padding: 8px; font-weight: bold; color: #1a56db;">${viaAtual}</td>
-                <td style="padding: 8px;">${instrucaoInicial}</td>
-                <td style="padding: 8px; text-align: right; font-weight: bold;">${kmFormatado} km</td>
-            </tr>`;
-    }
-
-    html += `</tbody></table>`;
-    
-    const totalKmGlobal = (distRotaMetros / 1000).toFixed(1).replace('.', ',');
+    // Destino Final (conforme o seu exemplo)
+    const destinoFinal = legs[legs.length - 1];
     html += `
-        <div style="margin-top: 15px; padding: 15px; border: 2px solid #000; display: flex; justify-content: space-between; font-weight: bold;">
-            <span>RELATÓRIO DE VIAGEM OPERACIONAL</span>
-            <span>TOTAL: ${totalKmGlobal} km</span>
+                </tbody>
+            </table>
+            
+            <div style="margin-top: 20px;">
+                <div style="font-size: 18px; font-weight: 500;">${destinoFinal.end_address.split(',')[0]}</div>
+                <div style="font-size: 14px; color: #70757a;">${destinoFinal.end_address.split(',').slice(-1)[0].trim()}</div>
+            </div>
+
+            <div style="margin-top: 30px; padding: 15px; background: #f8f9fa; border-radius: 8px; border: 1px solid #dadce0;">
+                <div style="display: flex; justify-content: space-between; font-weight: bold;">
+                    <span>RESUMO DA ROTA OPERACIONAL</span>
+                    <span>TOTAL: ${(distRotaMetros/1000).toFixed(1)} KM</span>
+                </div>
+            </div>
         </div>`;
 
-    if(listaEscrita) listaEscrita.innerHTML = html;
-    atualizarFinanceiro();
+    if (listaEscrita) {
+        listaEscrita.innerHTML = html;
+    }
+    
+    if (typeof atualizarFinanceiro === "function") atualizarFinanceiro();
 }
 function atualizarFinanceiro() {
     const kmVazio = distVazioMetros / 1000; 
@@ -500,6 +461,7 @@ window.onload = () => {
     script.defer = true;
     document.head.appendChild(script);
 };
+
 
 
 
