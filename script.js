@@ -436,3 +436,42 @@ function formatarMoeda(input) {
 });
 
 document.getElementById('imposto')?.addEventListener('change', atualizarFinanceiro);
+
+// --- Lógica de Exibição Dinâmica de Deslocamento ---
+
+// Função para inicializar os ouvintes de evento (chame isso ou garanta que o DOM carregou)
+document.addEventListener("DOMContentLoaded", function() {
+    
+    const campoSaida = document.getElementById("saida");
+    const containerDeslocamento = document.getElementById("container-config-deslocamento");
+    const selectTipo = document.getElementById("tipoDeslocamento");
+    const inputKm = document.getElementById("valorDeslocamentoKm");
+    const inputTotal = document.getElementById("valorDeslocamentoTotal");
+
+    if (campoSaida) {
+        campoSaida.addEventListener("input", function() {
+            if (this.value.trim() !== "") {
+                containerDeslocamento.style.display = "flex";
+            } else {
+                containerDeslocamento.style.display = "none";
+                // Resetar campos se apagar o endereço
+                selectTipo.value = "nao_remunerado";
+                inputKm.style.display = "none";
+                inputTotal.style.display = "none";
+            }
+        });
+    }
+
+    if (selectTipo) {
+        selectTipo.addEventListener("change", function() {
+            inputKm.style.display = "none";
+            inputTotal.style.display = "none";
+
+            if (this.value === "remunerado_km") {
+                inputKm.style.display = "block";
+            } else if (this.value === "remunerado_rs") {
+                inputTotal.style.display = "block";
+            }
+        });
+    }
+});
