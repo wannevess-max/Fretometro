@@ -274,112 +274,6 @@ function calcularRota() {
     });
 }
 
-/**
- * Processa a rota para gerar o resumo de "Longa Distância"
- * focado em grandes trechos e cidades de passagem.
- */
-function processarSegmentosRota(res) {
-    const route = res.routes[0];
-    const legs = route.legs;
-    const listaEscrita = document.getElementById("lista-passo-a-passo");
-    
-    let html = `
-        <div style="font-family: 'Google Sans', Roboto, Arial, sans-serif; color: #3c4043;">
-            <table style="width:100%; border-collapse: collapse;">
-                <thead>
-                    <tr style="border-bottom: 2px solid #e8eaed; background: #f8f9fa;">
-                        <th style="padding: 12px; text-align: left; width: 50px;">Seq</th>
-                        <th style="padding: 12px; text-align: left;">Resumo do Trecho (Rota Principal)</th>
-                        <th style="padding: 12px; text-align: right; width: 120px;">Distância</th>
-                    </tr>
-                </thead>
-                <tbody>`;
-
-    let globalSeq = 1;
-
-    legs.forEach((leg) => {
-        let segmentosGrandes = [];
-        let trechoAtual = null;
-
-        leg.steps.forEach((step) => {
-            const instrucaoLimpa = step.instructions.replace(/<[^>]*>?/gm, '');
-            // Captura as vias em negrito para o resumo
-            const viasEncontradas = (step.instructions.match(/<b>(.*?)<\/b>/g) || [])
-                                     .map(v => v.replace(/<[^>]*>?/gm, ''));
-            
-            const viaPrincipal = viasEncontradas[0] || "Vias locais";
-
-            // LÓGICA DE AGRUPAMENTO "RESUMO GOOGLE":
-            // Agrupamos se for a mesma via principal OU se o trecho for apenas uma transição 
-            // para uma rodovia maior (geralmente trechos curtos de acesso).
-            if (trechoAtual && (trechoAtual.viaReferencia === viaPrincipal || step.distance.value < 5000)) {
-                trechoAtual.distancia += step.distance.value;
-                trechoAtual.duracao += step.duration.value;
-                // Acumula as vias para mostrar o "via Rod. X, Rod. Y"
-                viasEncontradas.forEach(v => {
-                    if (!trechoAtual.todasVias.includes(v)) trechoAtual.todasVias.push(v);
-                });
-            } else {
-                if (trechoAtual) segmentosGrandes.push(trechoAtual);
-                
-                trechoAtual = {
-                    viaReferencia: viaPrincipal,
-                    todasVias: [...viasEncontradas],
-                    distancia: step.distance.value,
-                    duracao: step.duration.value,
-                    instrucaoTexto: instrucaoLimpa
-                };
-            }
-        });
-        if (trechoAtual) segmentosGrandes.push(trechoAtual);
-
-        // Renderização dos "Passos Maiores"
-        segmentosGrandes.forEach((seg) => {
-            const km = (seg.distancia / 1000).toFixed(1).replace('.', ',');
-            const horas = Math.floor(seg.duracao / 3600);
-            const minutos = Math.round((seg.duracao % 3600) / 60);
-            const tempoFormatado = horas > 0 ? `${horas} h ${minutos} min` : `${minutos} min`;
-
-            // Formatação do texto de vias (ex: "Pegue a Rod. X via Rod. Y")
-            let textoVias = `Siga pela <b>${seg.viaReferencia}</b>`;
-            if (seg.todasVias.length > 1) {
-                textoVias += ` via ${seg.todasVias.slice(1, 4).join(', ')}`;
-            }
-
-            html += `
-                <tr style="border-bottom: 1px solid #e8eaed;">
-                    <td style="padding: 15px 12px; vertical-align: top; color: #70757a; font-weight: bold;">
-                        ${globalSeq++}
-                    </td>
-                    <td style="padding: 15px 12px; vertical-align: top;">
-                        <div style="font-size: 14px; margin-bottom: 4px; color: #202124;">${textoVias}</div>
-                        <div style="font-size: 12px; color: #70757a;">${tempoFormatado} (${km} km)</div>
-                    </td>
-                    <td style="padding: 15px 12px; vertical-align: top; text-align: right; font-weight: 500; color: #1a73e8;">
-                        ${km} km
-                    </td>
-                </tr>`;
-        });
-    });
-
-    html += `</tbody></table></div>`;
-
-    // Footer com Totalizadores
-    const totalDistancia = legs.reduce((acc, l) => acc + l.distance.value, 0);
-    const totalTempoSeg = legs.reduce((acc, l) => acc + l.duration.value, 0);
-    const totalHoras = Math.floor(totalTempoSeg / 3600);
-
-    html += `
-        <div style="margin-top: 20px; padding: 20px; background: #202124; color: white; border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
-            <div style="font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Resumo Total da Rota</div>
-            <div style="text-align: right;">
-                <div style="font-size: 22px; font-weight: bold;">${(totalDistancia/1000).toFixed(0)} KM</div>
-                <div style="font-size: 13px; opacity: 0.8;">Tempo estimado: ${totalHoras} horas aprox.</div>
-            </div>
-        </div>`;
-
-    listaEscrita.innerHTML = html;
-}
 function atualizarFinanceiro() {
     const kmVazio = distVazioMetros / 1000; 
     const kmRota = distRotaMetros / 1000; 
@@ -485,6 +379,7 @@ window.onload = () => {
     script.defer = true;
     document.head.appendChild(script);
 };
+
 
 
 
