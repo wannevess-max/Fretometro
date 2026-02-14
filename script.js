@@ -2,14 +2,6 @@ let map, directionsRenderer, directionsService, paradasData = {}, rotaIniciada =
 let distVazioMetros = 0, distRotaMetros = 0;
 let frota = JSON.parse(localStorage.getItem('frota_db')) || [];
 
-const darkStyle = [
-    { "elementType": "geometry", "stylers": [{ "color": "#242f3e" }] }, 
-    { "elementType": "labels.text.fill", "stylers": [{ "color": "#746855" }] }, 
-    { "elementType": "labels.text.stroke", "stylers": [{ "color": "#242f3e" }] }, 
-    { "featureType": "road", "elementType": "geometry", "stylers": [{ "color": "#38414e" }] }, 
-    { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#17263c" }] }
-];
-
 // --- FUNÇÕES DE INTERFACE ---
 
 function toggleFrota() { 
@@ -77,7 +69,7 @@ function calcularRota() {
     const pontoVazio = document.getElementById("pontoVazio").value;
 
     if(!origem || !destino) {
-        alert("Informe pelo menos Origem e Destino.");
+        alert("Informe origem e destino.");
         return;
     }
 
@@ -114,6 +106,8 @@ function executarRotaPrincipal(origem, destino) {
             directionsRenderer.setDirections(res);
             distRotaMetros = res.routes[0].legs.reduce((acc, leg) => acc + leg.distance.value, 0);
             rotaIniciada = true;
+            
+            // CHAMADA CRÍTICA PARA O ROTEIRO
             processarSegmentosRota(res);
         } else {
             alert("Erro ao traçar rota: " + status);
@@ -121,73 +115,100 @@ function executarRotaPrincipal(origem, destino) {
     });
 }
 
-// --- FUNÇÃO PARA PROCESSAR O ROTEIRO (SINTÉTICO / RESUMIDO) ---
+// --- FUNÇÃO DE ROTEIRO RESUMIDO (ESTILO GOOGLE SINTÉTICO) ---
 
 function processarSegmentosRota(res) {
-    const route = res.routes[0];
-    const legs = route.legs;
+    console.log("Processando roteiro resumido..."); // Verificação na consola
     const listaEscrita = document.getElementById("lista-passo-a-passo");
     
-    let html = `<div style="padding: 10px; font-family: sans-serif; color: #333;">`;
+    if (!listaEscrita) {
+        console.error("Elemento lista-passo-a-passo não encontrado!");
+        return;
+    }
 
-    legs.forEach((leg) => {
-        // Cidade de Partida
-        html += `<div style="font-weight: bold; font-size: 15px; margin-bottom: 15px;">${leg.start_address.split(',')[0]}</div>`;
+    // LIMPA TUDO (Remove a mensagem "Calcule uma rota...")
+    listaEscrita.innerHTML = "";
 
-        let resumoAgrupado = [];
-        let itemAtual = null;
+    const legs = res.routes[0].legs;
+    let htmlFinal = `<div style="padding: 10px; font-family: 'Segoe UI', Tahoma, sans-serif;">`;
+
+    legs.forEach((leg, legIndex) => {
+        // Cidade de Origem (Ex: Jundiaí)
+        htmlFinal += `
+            <div style="margin-bottom: 20px;">
+                <div style="font-weight: bold; font-size: 16px; color: #1e293b;">${leg.start_address.split(',')[0]}</div>
+                <div style="font-size: 12px; color: #64748b;">${leg.start_address.split(',').slice(1).join(',')}</div>
+            </div>
+        `;
+
+        let segmentosSinteticos = [];
+        let trechoAtual = null;
 
         leg.steps.forEach((step) => {
+            // Extrair nomes de rodovias em negrito
             const matches = step.instructions.match(/<b>(.*?)<\/b>/g) || [];
             const viaPrincipal = matches[0] ? matches[0].replace(/<[^>]*>?/gm, '') : "Vias locais";
 
-            // Agrupamento Sintético: une trechos da mesma via ou manobras muito curtas
-            if (itemAtual && (itemAtual.via === viaPrincipal || step.distance.value < 15000)) {
-                itemAtual.distancia += step.distance.value;
-                itemAtual.duracao += step.duration.value;
+            // LÓGICA DE AGRUPAMENTO SINTÉTICO
+            // Se o passo for curto (< 25km) e não houver mudança drástica de via, agrupamos no resumo
+            if (trechoAtual && (trechoAtual.via === viaPrincipal || step.distance.value < 25000)) {
+                trechoAtual.distancia += step.distance.value;
+                trechoAtual.duracao += step.duration.value;
+                matches.forEach(m => {
+                    let v = m.replace(/<[^>]*>?/gm, '');
+                    if (!trechoAtual.viasNoTrecho.includes(v)) trechoAtual.viasNoTrecho.push(v);
+                });
             } else {
-                if (itemAtual) resumoAgrupado.push(itemAtual);
-                itemAtual = {
+                if (trechoAtual) segmentosSinteticos.push(trechoAtual);
+                trechoAtual = {
                     via: viaPrincipal,
-                    instrucao: step.instructions.split('<div')[0],
+                    viasNoTrecho: matches.map(m => m.replace(/<[^>]*>?/gm, '')),
                     distancia: step.distance.value,
-                    duracao: step.duration.value
+                    duracao: step.duration.value,
+                    instrucaoBase: step.instructions.split('<div')[0]
                 };
             }
         });
-        if (itemAtual) resumoAgrupado.push(itemAtual);
+        if (trechoAtual) segmentosSinteticos.push(trechoAtual);
 
-        resumoAgrupado.forEach((bloco) => {
-            const km = (bloco.distancia / 1000).toFixed(1).replace('.', ',');
-            const h = Math.floor(bloco.duracao / 3600);
-            const m = Math.round((bloco.duracao % 3600) / 60);
-            const tempoStr = h > 0 ? `${h} h ${m} min` : `${m} min`;
+        // Criar os blocos visuais
+        segmentosSinteticos.forEach((seg) => {
+            const km = (seg.distancia / 1000).toFixed(1).replace('.', ',');
+            const horas = Math.floor(seg.duracao / 3600);
+            const minutos = Math.round((seg.duracao % 3600) / 60);
+            const tempoStr = horas > 0 ? `${horas} h ${minutos} min` : `${minutos} min`;
 
-            html += `
-                <div style="display: flex; gap: 10px; margin-bottom: 20px; align-items: flex-start;">
-                    <div style="color: #666; font-size: 16px;"></div>
-                    <div>
-                        <div style="font-size: 13px; line-height: 1.4;">${bloco.instrucao}</div>
-                        <div style="font-size: 12px; color: #777; margin-top: 2px;">${tempoStr} (${km} km)</div>
+            // Formatação: "Siga pela [Rodovia] via [Conexões]"
+            let descricao = seg.instrucaoBase;
+            if (seg.viasNoTrecho.length > 1) {
+                descricao = `Pegue a <b>${seg.via}</b> via ${seg.viasNoTrecho.slice(1, 4).join(', ')}`;
+            }
+
+            htmlFinal += `
+                <div style="display: flex; gap: 12px; margin-bottom: 25px; align-items: flex-start;">
+                    <div style="color: #94a3b8; font-size: 18px; line-height: 1;"></div>
+                    <div style="flex: 1;">
+                        <div style="font-size: 14px; color: #1e293b; line-height: 1.5;">${descricao}</div>
+                        <div style="font-size: 12px; color: #64748b; margin-top: 4px; font-weight: 500;">${tempoStr} (${km} km)</div>
                     </div>
-                </div>`;
+                </div>
+            `;
         });
 
-        // Cidade de Destino
-        html += `<div style="font-weight: bold; font-size: 15px; margin-top: 5px;">${leg.end_address.split(',')[0]}</div>`;
-        html += `<div style="font-size: 11px; color: #999; margin-bottom: 20px;">${leg.end_address}</div>`;
+        // Cidade de Destino (Ex: João Pessoa)
+        htmlFinal += `
+            <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #e2e8f0;">
+                <div style="font-weight: bold; font-size: 16px; color: #1e293b;">${leg.end_address.split(',')[0]}</div>
+                <div style="font-size: 12px; color: #64748b;">${leg.end_address.split(',').slice(1).join(',')}</div>
+            </div>
+        `;
     });
 
-    html += `</div>`;
+    htmlFinal += `</div>`;
+    listaEscrita.innerHTML = htmlFinal;
 
-    // Aplicação segura conforme solicitado
-    if (listaEscrita) {
-        listaEscrita.innerHTML = html;
-    }
-    
-    if (typeof atualizarFinanceiro === "function") {
-        atualizarFinanceiro();
-    }
+    // Atualizar financeiro após processar rota
+    atualizarFinanceiro();
 }
 
 // --- LÓGICA FINANCEIRA ---
@@ -222,37 +243,25 @@ function atualizarFinanceiro() {
     const lucro = freteBase - totalCustos - impostoValor;
 
     const opt = { style: 'currency', currency: 'BRL' };
-    
-    // Atualização dos IDs existentes no HTML
-    const ids = {
-        "txt-km-total": kmTotal.toFixed(1) + " km",
-        "txt-km-vazio": kmVazio.toFixed(1) + " km",
-        "txt-custo-diesel": custoCombustivel.toLocaleString('pt-BR', opt),
-        "txt-an-pedagio": pedagio.toLocaleString('pt-BR', opt),
-        "txt-an-manut": custoManut.toLocaleString('pt-BR', opt),
-        "txt-an-frio": custoFrio.toLocaleString('pt-BR', opt),
-        "txt-total-custos": totalCustos.toLocaleString('pt-BR', opt),
-        "txt-an-frete-liquido": freteBase.toLocaleString('pt-BR', opt),
-        "txt-an-imposto": impostoValor.toLocaleString('pt-BR', opt),
-        "txt-lucro-real": lucro.toLocaleString('pt-BR', opt)
-    };
+    document.getElementById("txt-km-total").innerText = kmTotal.toFixed(1) + " km";
+    document.getElementById("txt-km-vazio").innerText = kmVazio.toFixed(1) + " km";
+    document.getElementById("txt-custo-diesel").innerText = custoCombustivel.toLocaleString('pt-BR', opt);
+    document.getElementById("txt-an-pedagio").innerText = pedagio.toLocaleString('pt-BR', opt);
+    document.getElementById("txt-an-manut").innerText = custoManut.toLocaleString('pt-BR', opt);
+    document.getElementById("txt-an-frio").innerText = custoFrio.toLocaleString('pt-BR', opt);
+    document.getElementById("txt-total-custos").innerText = totalCustos.toLocaleString('pt-BR', opt);
+    document.getElementById("txt-an-frete-liquido").innerText = freteBase.toLocaleString('pt-BR', opt);
+    document.getElementById("txt-an-imposto").innerText = impostoValor.toLocaleString('pt-BR', opt);
+    document.getElementById("txt-lucro-real").innerText = lucro.toLocaleString('pt-BR', opt);
 
-    for (let id in ids) {
-        const el = document.getElementById(id);
-        if (el) el.innerText = ids[id];
-    }
-
-    const visualVazio = document.getElementById("visual-vazio");
-    if(visualVazio && kmGeral > 0) {
-        visualVazio.style.width = ((kmVazio / kmGeral) * 100) + "%";
-    }
+    const pVazio = kmGeral > 0 ? (kmVazio / kmGeral) * 100 : 0;
+    if(document.getElementById("visual-vazio")) document.getElementById("visual-vazio").style.width = pVazio + "%";
 }
 
-// --- GESTÃO DE PARADAS ---
+// --- GESTÃO DE PARADAS (WAYPOINTS) ---
 
 function adicionarParada() {
     const container = document.getElementById("container-paradas");
-    if(!container) return;
     const div = document.createElement("div");
     div.className = "parada-item";
     div.innerHTML = `
@@ -285,13 +294,14 @@ function salvarVeiculo() {
 
 function renderFrota() {
     const list = document.getElementById("lista-frota");
-    if(!list) return;
     list.innerHTML = "";
     frota.forEach(v => {
         const div = document.createElement("div");
         div.className = "veiculo-card";
         div.innerHTML = `
-            <div><strong>${v.nome}</strong><br><small>${v.placa}</small></div>
+            <div>
+                <strong>${v.nome}</strong><br><small>${v.placa}</small>
+            </div>
             <button onclick="selecionarVeiculo(${v.id})" style="padding:5px 10px; font-size:10px;">Selecionar</button>
             <button onclick="excluirVeiculo(${v.id})" style="padding:5px 10px; font-size:10px; background:red;">×</button>
         `;
@@ -302,12 +312,9 @@ function renderFrota() {
 function selecionarVeiculo(id) {
     const v = frota.find(x => x.id === id);
     if(v) {
-        const d = document.getElementById("custoDieselLitro");
-        const m = document.getElementById("consumoDieselMedia");
-        const mn = document.getElementById("custoManutencaoKm");
-        if(d) d.value = v.diesel;
-        if(m) m.value = v.media;
-        if(mn) mn.value = v.manut;
+        document.getElementById("custoDieselLitro").value = v.diesel;
+        document.getElementById("consumoDieselMedia").value = v.media;
+        document.getElementById("custoManutencaoKm").value = v.manut;
         atualizarFinanceiro();
         toggleFrota();
     }
@@ -320,10 +327,7 @@ function excluirVeiculo(id) {
 }
 
 function limparFormFrota() {
-    ["f-nome", "f-placa", "f-diesel", "f-media", "f-manut"].forEach(id => {
-        const el = document.getElementById(id);
-        if(el) el.value = "";
-    });
+    ["f-nome", "f-placa", "f-diesel", "f-media", "f-manut"].forEach(id => document.getElementById(id).value = "");
 }
 
 window.onload = initMap;
