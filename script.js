@@ -471,7 +471,8 @@ function limparPainelCustos() {
 
 window.onload = () => {
     const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyClbY5ZvkjrMGP4nJmZzCcm4hUu5-fjZV0&libraries=places&callback=initApp`;
+    script.src = "https://maps.googleapis.com/maps/api/js?key=AIzaSyClbY5ZvkjrMGP4nJmZzCcm4hUu5-fjZV0&libraries=places&callback=initApp";
     script.async = true;
+    script.defer = true;
     document.head.appendChild(script);
 };
