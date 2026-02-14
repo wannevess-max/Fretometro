@@ -34,11 +34,11 @@ function toggleAparelhoFrio() {
     const div = document.getElementById("div-aparelho-frio");
     const rowAn = document.getElementById("row-an-frio");
     if(tipo === "frigorificada") {
-        if(div) div.style.display = "block";
-        if(rowAn) rowAn.style.display = "flex";
+        div.style.display = "block";
+        rowAn.style.display = "flex";
     } else {
-        if(div) div.style.display = "none";
-        if(rowAn) rowAn.style.display = "none";
+        div.style.display = "none";
+        rowAn.style.display = "none";
     }
     atualizarFinanceiro();
 }
@@ -46,7 +46,7 @@ function toggleAparelhoFrio() {
 // --- LÓGICA DO MAPA ---
 
 function initMap() {
-    // Verificação para evitar erro de 'google is not defined'
+    // PROTEÇÃO CONTRA O ERRO DE CONSOLE:
     if (typeof google === 'undefined') {
         console.log("Aguardando Google Maps carregar...");
         setTimeout(initMap, 500);
@@ -71,7 +71,7 @@ function initMap() {
 }
 
 function setupAutocomplete() {
-    const inputs = ["origem", "destino", "pontoVazio"];
+    const inputs = ["origem", "destino", "saida"];
     inputs.forEach(id => {
         const el = document.getElementById(id);
         if(el && typeof google !== 'undefined') new google.maps.places.Autocomplete(el);
@@ -81,7 +81,7 @@ function setupAutocomplete() {
 function calcularRota() {
     const origem = document.getElementById("origem").value;
     const destino = document.getElementById("destino").value;
-    const pontoVazio = document.getElementById("pontoVazio").value;
+    const pontoVazio = document.getElementById("saida").value;
 
     if(!origem || !destino) {
         alert("Informe pelo menos Origem e Destino.");
@@ -128,6 +128,8 @@ function executarRotaPrincipal(origem, destino) {
     });
 }
 
+// --- FUNÇÃO PARA PROCESSAR O ROTEIRO (SINTÉTICO / RESUMIDO) ---
+
 function processarSegmentosRota(res) {
     const route = res.routes[0];
     const legs = route.legs;
@@ -137,6 +139,7 @@ function processarSegmentosRota(res) {
 
     legs.forEach((leg) => {
         html += `<div style="font-weight: bold; font-size: 15px; margin-bottom: 15px; color: #2563eb;">${leg.start_address.split(',')[0]}</div>`;
+
         let resumoAgrupado = [];
         let itemAtual = null;
 
@@ -180,8 +183,14 @@ function processarSegmentosRota(res) {
     });
 
     html += `</div>`;
-    if (listaEscrita) listaEscrita.innerHTML = html;
-    atualizarFinanceiro();
+
+    if (listaEscrita) {
+        listaEscrita.innerHTML = html;
+    }
+    
+    if (typeof atualizarFinanceiro === "function") {
+        atualizarFinanceiro();
+    }
 }
 
 // --- LÓGICA FINANCEIRA ---
@@ -197,37 +206,34 @@ function atualizarFinanceiro() {
     const arlaP = (parseFloat(document.getElementById("arlaPorcentagem")?.value) || 0) / 100;
     const pedagio = parseFloat(document.getElementById("custoPedagio")?.value) || 0;
     const manutKm = parseFloat(document.getElementById("custoManutencaoKm")?.value) || 0;
-    const freteBase = parseFloat(document.getElementById("valorFrete")?.value) || 0;
-    const impostoP = (parseFloat(document.getElementById("porcentagemImposto")?.value) || 0) / 100;
+    const freteBase = parseFloat(document.getElementById("valorPorKm")?.value) || 0; 
+    const impostoP = parseFloat(document.getElementById("imposto")?.value) || 1;
 
     const custoCombustivel = consumoM > 0 ? (kmGeral / consumoM) * dieselL : 0;
     const custoArla = consumoM > 0 ? ((kmGeral / consumoM) * arlaP) * arlaL : 0;
     const custoManut = kmGeral * manutKm;
     
     let custoFrio = 0;
-    const tipoCargaEl = document.getElementById("tipoCarga");
-    if(tipoCargaEl && tipoCargaEl.value === "frigorificada") {
-        const horas = parseFloat(document.getElementById("horasFrio")?.value) || 0;
+    const tipoCarga = document.getElementById("tipoCarga")?.value;
+    if(tipoCarga === "frigorifica") {
         const consH = parseFloat(document.getElementById("consumoFrioHora")?.value) || 0;
-        custoFrio = horas * consH * dieselL;
+        custoFrio = consH * dieselL; 
     }
 
     const totalCustos = custoCombustivel + custoArla + custoManut + pedagio + custoFrio;
-    const impostoValor = freteBase * impostoP;
-    const lucro = freteBase - totalCustos - impostoValor;
+    const lucro = (freteBase * kmTotal * impostoP) - totalCustos;
 
     const opt = { style: 'currency', currency: 'BRL' };
     
     const ids = {
-        "txt-km-total": kmTotal.toFixed(1) + " km",
-        "txt-km-vazio": kmVazio.toFixed(1) + " km",
-        "txt-custo-diesel": custoCombustivel.toLocaleString('pt-BR', opt),
+        "txt-km-total": kmGeral.toFixed(1) + " km",
+        "txt-km-vazio-det": kmVazio.toFixed(1) + " km",
+        "txt-km-rota-det": kmTotal.toFixed(1) + " km",
+        "txt-an-diesel": custoCombustivel.toLocaleString('pt-BR', opt),
         "txt-an-pedagio": pedagio.toLocaleString('pt-BR', opt),
         "txt-an-manut": custoManut.toLocaleString('pt-BR', opt),
         "txt-an-frio": custoFrio.toLocaleString('pt-BR', opt),
         "txt-total-custos": totalCustos.toLocaleString('pt-BR', opt),
-        "txt-an-frete-liquido": freteBase.toLocaleString('pt-BR', opt),
-        "txt-an-imposto": impostoValor.toLocaleString('pt-BR', opt),
         "txt-lucro-real": lucro.toLocaleString('pt-BR', opt)
     };
 
@@ -235,41 +241,37 @@ function atualizarFinanceiro() {
         const el = document.getElementById(id);
         if (el) el.innerText = ids[id];
     }
-
-    const visualVazio = document.getElementById("visual-vazio");
-    if(visualVazio && kmGeral > 0) {
-        visualVazio.style.width = ((kmVazio / kmGeral) * 100) + "%";
-    }
 }
 
 // --- GESTÃO DE PARADAS ---
 
 function adicionarParada() {
-    const container = document.getElementById("container-paradas");
+    const container = document.getElementById("container-paradas") || document.getElementById("lista-pontos");
     if(!container) return;
-    const div = document.createElement("div");
-    div.className = "parada-item";
-    div.innerHTML = `
-        <input type="text" class="parada-input" placeholder="Cidade de parada...">
-        <button onclick="this.parentElement.remove(); calcularRota();">×</button>
+    const li = document.createElement("li");
+    li.className = "ponto-item sortable-item";
+    li.innerHTML = `
+        <span class="handle">☰</span>
+        <input type="text" class="parada-input" placeholder="Cidade de parada..." autocomplete="off">
+        <button onclick="this.parentElement.remove(); calcularRota();" style="background:none; border:none; color:red; cursor:pointer;">×</button>
     `;
-    container.appendChild(div);
-    if(typeof google !== 'undefined') new google.maps.places.Autocomplete(div.querySelector("input"));
+    container.insertBefore(li, document.getElementById("li-destino"));
+    if(typeof google !== 'undefined') new google.maps.places.Autocomplete(li.querySelector("input"));
 }
 
 // --- GESTÃO DE FROTA ---
 
 function salvarVeiculo() {
-    const nome = document.getElementById("f-nome")?.value;
-    const placa = document.getElementById("f-placa")?.value;
+    const nome = document.getElementById("f-nome").value;
+    const placa = document.getElementById("f-placa").value;
     if(!nome || !placa) return;
 
     const v = {
         id: Date.now(),
         nome, placa,
-        diesel: document.getElementById("f-diesel")?.value,
-        media: document.getElementById("f-media")?.value,
-        manut: document.getElementById("f-manut")?.value
+        diesel: document.getElementById("f-diesel")?.value || 0,
+        media: document.getElementById("f-consumo")?.value || 0,
+        manut: document.getElementById("f-manut")?.value || 0
     };
     frota.push(v);
     localStorage.setItem('frota_db', JSON.stringify(frota));
@@ -278,7 +280,7 @@ function salvarVeiculo() {
 }
 
 function renderFrota() {
-    const list = document.getElementById("lista-frota");
+    const list = document.getElementById("lista-v-render");
     if(!list) return;
     list.innerHTML = "";
     frota.forEach(v => {
@@ -287,7 +289,7 @@ function renderFrota() {
         div.innerHTML = `
             <div><strong>${v.nome}</strong><br><small>${v.placa}</small></div>
             <button onclick="selecionarVeiculo(${v.id})" style="padding:5px 10px; font-size:10px;">Selecionar</button>
-            <button onclick="excluirVeiculo(${v.id})" style="padding:5px 10px; font-size:10px; background:red;">×</button>
+            <button onclick="excluirVeiculo(${v.id})" style="padding:5px 10px; font-size:10px; background:red; color:white; border:none; border-radius:4px;">×</button>
         `;
         list.appendChild(div);
     });
@@ -296,12 +298,9 @@ function renderFrota() {
 function selecionarVeiculo(id) {
     const v = frota.find(x => x.id === id);
     if(v) {
-        const d = document.getElementById("custoDieselLitro");
-        const m = document.getElementById("consumoDieselMedia");
-        const mn = document.getElementById("custoManutencaoKm");
-        if(d) d.value = v.diesel;
-        if(m) m.value = v.media;
-        if(mn) mn.value = v.manut;
+        if(document.getElementById("custoDieselLitro")) document.getElementById("custoDieselLitro").value = v.diesel;
+        if(document.getElementById("consumoDieselMedia")) document.getElementById("consumoDieselMedia").value = v.media;
+        if(document.getElementById("custoManutencaoKm")) document.getElementById("custoManutencaoKm").value = v.manut;
         atualizarFinanceiro();
         toggleFrota();
     }
@@ -314,10 +313,12 @@ function excluirVeiculo(id) {
 }
 
 function limparFormFrota() {
-    ["f-nome", "f-placa", "f-diesel", "f-media", "f-manut"].forEach(id => {
+    ["f-nome", "f-placa", "f-diesel", "f-consumo", "f-manut"].forEach(id => {
         const el = document.getElementById(id);
         if(el) el.value = "";
     });
 }
 
 window.onload = initMap;
+document.getElementById("btnAddParada")?.addEventListener("click", adicionarParada);
+document.getElementById("btnCalcular")?.addEventListener("click", calcularRota);
