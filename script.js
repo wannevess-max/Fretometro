@@ -81,7 +81,6 @@ function calcularRota() {
         return;
     }
 
-    // 1. Rota de Deslocamento (Vazio)
     if(pontoVazio) {
         directionsService.route({
             origin: pontoVazio,
@@ -122,17 +121,80 @@ function executarRotaPrincipal(origem, destino) {
     });
 }
 
-// --- FUNÇÃO PARA PROCESSAR O ROTEIRO (LIMPA PARA RECOMEÇAR DO ZERO) ---
+// --- FUNÇÃO PARA PROCESSAR O ROTEIRO (SINTÉTICO / RESUMIDO) ---
 
 function processarSegmentosRota(res) {
     const route = res.routes[0];
     const legs = route.legs;
     const listaEscrita = document.getElementById("lista-passo-a-passo");
     
-    // Conteúdo limpo para iniciarmos a nova lógica de agrupamento
-    listaEscrita.innerHTML = "";
+    let html = `<div style="padding: 15px; font-family: sans-serif;">`;
 
-    // Chama o financeiro para atualizar os custos baseados na nova distância
+    legs.forEach((leg, index) => {
+        // Nome da Origem do Leg
+        html += `<div style="font-weight: bold; font-size: 16px; margin-bottom: 20px;">${leg.start_address.split(',')[0]}</div>`;
+
+        let resumoAgrupado = [];
+        let itemAtual = null;
+
+        leg.steps.forEach((step) => {
+            const instrucaoHTML = step.instructions;
+            // Extrai termos em negrito (Rodovias/Cidades)
+            const partesNegrito = (instrucaoHTML.match(/<b>(.*?)<\/b>/g) || [])
+                                   .map(t => t.replace(/<[^>]*>?/gm, ''));
+            
+            const viaPrincipal = partesNegrito[0] || "Vias locais";
+
+            // Lógica de agrupamento: Agrupa steps que pertencem à mesma via principal
+            // ou que são trechos curtos (< 10km) para evitar poluição no relatório
+            if (itemAtual && (itemAtual.via === viaPrincipal || step.distance.value < 10000)) {
+                itemAtual.distancia += step.distance.value;
+                itemAtual.duracao += step.duration.value;
+                // Adiciona novas vias mencionadas ao "via Rod. X, Rod. Y"
+                partesNegrito.forEach(p => {
+                    if (!itemAtual.viasSecundarias.includes(p)) itemAtual.viasSecundarias.push(p);
+                });
+            } else {
+                if (itemAtual) resumoAgrupado.push(itemAtual);
+                itemAtual = {
+                    via: viaPrincipal,
+                    viasSecundarias: [...partesNegrito],
+                    distancia: step.distance.value,
+                    duracao: step.duration.value,
+                    textoOriginal: instrucaoHTML
+                };
+            }
+        });
+        if (itemAtual) resumoAgrupado.push(itemAtual);
+
+        // Renderização dos Blocos Sintéticos
+        resumoAgrupado.forEach((bloco) => {
+            const km = (bloco.distancia / 1000).toFixed(1).replace('.', ',');
+            const horas = Math.floor(bloco.duracao / 3600);
+            const minutos = Math.round((bloco.duracao % 3600) / 60);
+            const tempoStr = horas > 0 ? `${horas} h ${minutos} min` : `${minutos} min`;
+
+            // Formatação do texto similar ao print: "Pegue a [Via] via [Secundarias]"
+            let tituloTrecho = bloco.textoOriginal.split('<div')[0]; // Remove avisos de trânsito se houver
+            
+            html += `
+                <div style="display: flex; gap: 15px; margin-bottom: 25px; align-items: flex-start;">
+                    <div style="color: #5f6368; font-size: 20px;"></div>
+                    <div>
+                        <div style="font-size: 14px; color: #202124; line-height: 1.4;">${tituloTrecho}</div>
+                        <div style="font-size: 13px; color: #70757a; margin-top: 4px;">${tempoStr} (${km} km)</div>
+                    </div>
+                </div>`;
+        });
+
+        // Nome do Destino Final do Leg
+        html += `<div style="font-weight: bold; font-size: 16px; margin-top: 10px;">${leg.end_address.split(',')[0]}</div>`;
+        html += `<div style="color: #70757a; font-size: 12px; margin-bottom: 20px;">${leg.end_address.split(',').slice(1).join(',')}</div>`;
+    });
+
+    html += `</div>`;
+    listaEscrita.innerHTML = html;
+
     if (typeof atualizarFinanceiro === "function") atualizarFinanceiro();
 }
 
@@ -167,7 +229,6 @@ function atualizarFinanceiro() {
     const impostoValor = freteBase * impostoP;
     const lucro = freteBase - totalCustos - impostoValor;
 
-    // Atualização do Painel Lateral
     const opt = { style: 'currency', currency: 'BRL' };
     document.getElementById("txt-km-total").innerText = kmTotal.toFixed(1) + " km";
     document.getElementById("txt-km-vazio").innerText = kmVazio.toFixed(1) + " km";
@@ -180,7 +241,6 @@ function atualizarFinanceiro() {
     document.getElementById("txt-an-imposto").innerText = impostoValor.toLocaleString('pt-BR', opt);
     document.getElementById("txt-lucro-real").innerText = lucro.toLocaleString('pt-BR', opt);
 
-    // Ajuste visual da barra de vazio/rota
     const pVazio = kmGeral > 0 ? (kmVazio / kmGeral) * 100 : 0;
     if(document.getElementById("visual-vazio")) document.getElementById("visual-vazio").style.width = pVazio + "%";
 }
