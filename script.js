@@ -292,8 +292,8 @@ function processarSegmentosRota(res) {
             <thead>
                 <tr style="background: #f8fafc; border-bottom: 2px solid #e2e8f0;">
                     <th style="width: 45px; padding: 10px; text-align: left;">Seq</th>
-                    <th style="width: 180px; padding: 10px; text-align: left;">Estrada / Cidade</th>
-                    <th style="width: 140px; padding: 10px; text-align: left;">Referência (Via)</th>
+                    <th style="width: 200px; padding: 10px; text-align: left;">Estrada / Cidade</th>
+                    <th style="width: 150px; padding: 10px; text-align: left;">Referência (Via)</th>
                     <th style="padding: 10px; text-align: left;">Nome do Trecho</th>
                     <th style="width: 85px; padding: 10px; text-align: right;">KM</th>
                 </tr>
@@ -305,72 +305,77 @@ function processarSegmentosRota(res) {
 
     legs.forEach((leg, legIndex) => {
         const isVazio = (temSaida && legIndex === 0);
-        const partesEnd = leg.start_address.split(',');
-        let cidadeUF = "Rota";
-        let ufAtual = "";
-
-        if (partesEnd.length >= 3) {
-            const trechoLocal = partesEnd[partesEnd.length - 3].trim();
-            cidadeUF = trechoLocal;
-            const ufMatch = trechoLocal.match(/\b([A-Z]{2})\b/);
-            ufAtual = ufMatch ? ufMatch[1] : "";
-        }
-
+        
         leg.steps.forEach((step) => {
             const instrucaoHTML = step.instructions;
             const instrucaoLimpa = instrucaoHTML.replace(/<[^>]*>?/gm, '');
 
+            // --- LÓGICA DE EXTRAÇÃO DE CIDADE E UF ---
+            // Tentamos pegar a cidade e estado do final da instrução ou do endereço do leg
+            let cidadeUF = "Rota";
+            let ufAtual = "";
+            const matchLocal = leg.end_address.match(/([^,-]+),\s*([A-Z]{2})\b/);
+            if (matchLocal) {
+                cidadeUF = `${matchLocal[1].trim()} / ${matchLocal[2]}`;
+                ufAtual = matchLocal[2];
+            }
+
+            // --- LÓGICA DE DIVISA DE ESTADO ---
             if (ufAtual && estadoAnterior && ufAtual !== estadoAnterior) {
                 html += `
-                    <tr style="background: #0f172a; color: white;">
-                        <td colspan="5" style="padding: 12px; text-align: center; font-weight: bold; font-size: 12px; letter-spacing: 2px;">
-                            DIVISA DE ESTADO: ENTRANDO EM ${ufAtual} ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬
+                    <tr style="background: #f1f5f9; font-weight: bold;">
+                        <td style="padding: 10px;">${ufAtual}</td>
+                        <td colspan="3" style="padding: 10px; text-align: center; letter-spacing: 1px;">
+                            ---------- DIVISA DE ESTADO ----------
                         </td>
+                        <td style="padding: 10px;">----------</td>
                     </tr>`;
             }
             estadoAnterior = ufAtual;
 
-            let viaRef = "Urbano";
-            const viaSigla = instrucaoHTML.match(/\b([A-Z]{2}-\d{3,4})\b/); 
-            const textoNegrito = instrucaoHTML.match(/<b>(.*?)<\/b>/g);
-
+            // --- LÓGICA DE EXTRAÇÃO DA VIA (Ex: SP-330, BR-116) ---
+            let viaRef = "Acesso";
+            const viaSigla = instrucaoHTML.match(/\b([A-Z]{2}-\d{3})\b/);
             if (viaSigla) {
-                viaRef = viaSigla[1]; 
-            } else if (textoNegrito) {
-                const comandosProibidos = /Vire|Mantenha|Siga|Curva|Saída|Esquerda|Direita|Direção|ª|Acesso/i;
-                for (let n of textoNegrito) {
-                    let bText = n.replace(/<[^>]*>?/gm, '');
-                    if (!comandosProibidos.test(bText) && bText.length > 2) {
-                        viaRef = bText;
-                        break;
+                viaRef = viaSigla[1];
+            } else {
+                // Tenta pegar nomes de Rodovias em negrito
+                const negritos = instrucaoHTML.match(/<b>(.*?)<\/b>/g);
+                if (negritos) {
+                    for (let n of negritos) {
+                        let txt = n.replace(/<[^>]*>?/gm, '');
+                        if (txt.includes("Rod.") || txt.includes("Rodovia") || txt.includes("Av.")) {
+                            viaRef = txt;
+                            break;
+                        }
                     }
                 }
             }
 
             html += `
                 <tr style="border-bottom: 1px solid #f1f5f9; ${isVazio ? 'background: #fffbeb;' : ''}">
-                    <td style="padding: 8px; color: #94a3b8; font-size: 11px;">${globalSeq}</td>
-                    <td style="padding: 8px; font-weight: 600; font-size: 11px;">${cidadeUF}</td>
-                    <td style="padding: 8px; font-weight: bold; color: #2563eb; font-size: 11px;">${viaRef}</td>
-                    <td style="padding: 8px; font-size: 12px; color: #334155;">${instrucaoLimpa}</td>
-                    <td style="padding: 8px; font-weight: bold; text-align: right; font-size: 11px;">${step.distance.text}</td>
+                    <td style="padding: 8px; color: #64748b;">${globalSeq}</td>
+                    <td style="padding: 8px; font-weight: 500;">${cidadeUF}</td>
+                    <td style="padding: 8px; font-weight: bold; color: #2563eb;">${viaRef}</td>
+                    <td style="padding: 8px; color: #334155;">${instrucaoLimpa}</td>
+                    <td style="padding: 8px; font-weight: bold; text-align: right;">${step.distance.text}</td>
                 </tr>`;
             globalSeq++;
         });
     });
 
     html += `</tbody></table>`;
+    
     const totalKm = ((distVazioMetros + distRotaMetros) / 1000).toFixed(1);
     html += `
-        <div style="margin-top: 15px; padding: 15px; background: #f8fafc; border-top: 2px solid #cbd5e1; display: flex; justify-content: space-between; align-items: center;">
-            <span style="font-size: 11px; color: #64748b; font-weight: bold;">RELATÓRIO DE VIAGEM OPERACIONAL</span>
-            <span style="font-size: 18px; color: #1e293b;">DISTÂNCIA TOTAL: <strong>${totalKm.replace('.', ',')} km</strong></span>
+        <div style="margin-top: 15px; padding: 15px; background: #f8fafc; border-top: 2px solid #cbd5e1; display: flex; justify-content: space-between;">
+            <span style="font-weight: bold; color: #64748b;">RELATÓRIO DE VIAGEM OPERACIONAL</span>
+            <span style="font-size: 16px;">KILOMETRAGEM TOTAL: <strong>${totalKm.replace('.', ',')} km</strong></span>
         </div>`;
 
     if(listaEscrita) listaEscrita.innerHTML = html;
     atualizarFinanceiro();
 }
-
 function atualizarFinanceiro() {
     const kmVazio = distVazioMetros / 1000; 
     const kmRota = distRotaMetros / 1000; 
@@ -476,3 +481,4 @@ window.onload = () => {
     script.defer = true;
     document.head.appendChild(script);
 };
+
