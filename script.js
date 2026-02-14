@@ -129,13 +129,24 @@ function initMap() {
     
     // Inicializa a restauração do layout salvo
     restaurarPosicaoPaineis();
+
+    // Gatilhos automáticos para campos de texto ao perder o foco (blur)
+    document.getElementById("origem")?.addEventListener('blur', calcularRota);
+    document.getElementById("destino")?.addEventListener('blur', calcularRota);
+    document.getElementById("saida")?.addEventListener('blur', calcularRota);
 }
 
 function setupAutocomplete() {
     const inputs = ["origem", "destino", "saida"];
     inputs.forEach(id => {
         const el = document.getElementById(id);
-        if(el) new google.maps.places.Autocomplete(el);
+        if(el) {
+            const autocomplete = new google.maps.places.Autocomplete(el);
+            // Chama o cálculo automaticamente ao selecionar local da lista
+            autocomplete.addListener('place_changed', () => {
+                calcularRota();
+            });
+        }
     });
 }
 
@@ -144,8 +155,8 @@ function calcularRota() {
     const destino = document.getElementById("destino").value;
     const pontoVazio = document.getElementById("saida").value;
 
+    // Sai da função silenciosamente se os campos principais não estiverem preenchidos
     if(!origem || !destino) {
-        alert("Informe pelo menos Origem e Destino.");
         return;
     }
 
@@ -186,8 +197,6 @@ function executarRotaPrincipal(origem, destino) {
             directionsRenderer.setDirections(res);
             distRotaMetros = res.routes[0].legs.reduce((acc, leg) => acc + leg.distance.value, 0);
             processarSegmentosRota(res);
-        } else {
-            alert("Erro ao traçar rota: " + status);
         }
     });
 }
@@ -325,7 +334,12 @@ function adicionarParada() {
     `;
     const destino = document.getElementById("li-destino");
     container.insertBefore(li, destino);
-    new google.maps.places.Autocomplete(li.querySelector("input"));
+    
+    const input = li.querySelector("input");
+    const autocomplete = new google.maps.places.Autocomplete(input);
+    autocomplete.addListener('place_changed', () => {
+        calcularRota();
+    });
 }
 
 // --- GESTÃO DE FROTA ---
@@ -421,4 +435,4 @@ function formatarMoeda(input) {
     if(el) el.addEventListener('input', atualizarFinanceiro);
 });
 
-document.getElementById('imposto').addEventListener('change', atualizarFinanceiro);
+document.getElementById('imposto')?.addEventListener('change', atualizarFinanceiro);
