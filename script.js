@@ -107,7 +107,7 @@ function executarRotaPrincipal(origem, destino) {
             distRotaMetros = res.routes[0].legs.reduce((acc, leg) => acc + leg.distance.value, 0);
             rotaIniciada = true;
             
-            // CHAMADA CRÍTICA PARA O ROTEIRO
+            // Chama o processamento do roteiro sintetizado
             processarSegmentosRota(res);
         } else {
             alert("Erro ao traçar rota: " + status);
@@ -115,103 +115,99 @@ function executarRotaPrincipal(origem, destino) {
     });
 }
 
-// --- FUNÇÃO DE ROTEIRO RESUMIDO (ESTILO GOOGLE SINTÉTICO) ---
+// --- FUNÇÃO DE ROTEIRO RESUMIDO (SOLUÇÃO FINAL PARA O PAINEL) ---
 
 function processarSegmentosRota(res) {
-    console.log("Processando roteiro resumido..."); // Verificação na consola
     const listaEscrita = document.getElementById("lista-passo-a-passo");
     
     if (!listaEscrita) {
-        console.error("Elemento lista-passo-a-passo não encontrado!");
+        console.error("ERRO: Elemento 'lista-passo-a-passo' não encontrado no HTML.");
         return;
     }
 
-    // LIMPA TUDO (Remove a mensagem "Calcule uma rota...")
-    listaEscrita.innerHTML = "";
+    // LIMPEZA TOTAL E ABSOLUTA DO PAINEL
+    listaEscrita.innerHTML = ""; 
 
     const legs = res.routes[0].legs;
-    let htmlFinal = `<div style="padding: 10px; font-family: 'Segoe UI', Tahoma, sans-serif;">`;
+    let htmlContent = `<div style="padding: 10px; color: #1e293b;">`;
 
-    legs.forEach((leg, legIndex) => {
-        // Cidade de Origem (Ex: Jundiaí)
-        htmlFinal += `
+    legs.forEach((leg) => {
+        // ORIGEM
+        htmlContent += `
             <div style="margin-bottom: 20px;">
-                <div style="font-weight: bold; font-size: 16px; color: #1e293b;">${leg.start_address.split(',')[0]}</div>
-                <div style="font-size: 12px; color: #64748b;">${leg.start_address.split(',').slice(1).join(',')}</div>
+                <div style="font-weight: 800; font-size: 15px; color: #2563eb; text-transform: uppercase;">${leg.start_address.split(',')[0]}</div>
+                <div style="font-size: 11px; color: #94a3b8;">${leg.start_address}</div>
             </div>
         `;
 
-        let segmentosSinteticos = [];
-        let trechoAtual = null;
+        let grupos = [];
+        let atual = null;
 
         leg.steps.forEach((step) => {
-            // Extrair nomes de rodovias em negrito
-            const matches = step.instructions.match(/<b>(.*?)<\/b>/g) || [];
-            const viaPrincipal = matches[0] ? matches[0].replace(/<[^>]*>?/gm, '') : "Vias locais";
+            const match = step.instructions.match(/<b>(.*?)<\/b>/g) || [];
+            const via = match[0] ? match[0].replace(/<[^>]*>?/gm, '') : "Vias locais";
 
-            // LÓGICA DE AGRUPAMENTO SINTÉTICO
-            // Se o passo for curto (< 25km) e não houver mudança drástica de via, agrupamos no resumo
-            if (trechoAtual && (trechoAtual.via === viaPrincipal || step.distance.value < 25000)) {
-                trechoAtual.distancia += step.distance.value;
-                trechoAtual.duracao += step.duration.value;
-                matches.forEach(m => {
+            // Agrupamento sintético (se for a mesma via ou trecho < 30km)
+            if (atual && (atual.via === via || step.distance.value < 30000)) {
+                atual.dist += step.distance.value;
+                atual.tempo += step.duration.value;
+                match.forEach(m => {
                     let v = m.replace(/<[^>]*>?/gm, '');
-                    if (!trechoAtual.viasNoTrecho.includes(v)) trechoAtual.viasNoTrecho.push(v);
+                    if(!atual.vias.includes(v)) atual.vias.push(v);
                 });
             } else {
-                if (trechoAtual) segmentosSinteticos.push(trechoAtual);
-                trechoAtual = {
-                    via: viaPrincipal,
-                    viasNoTrecho: matches.map(m => m.replace(/<[^>]*>?/gm, '')),
-                    distancia: step.distance.value,
-                    duracao: step.duration.value,
-                    instrucaoBase: step.instructions.split('<div')[0]
+                if (atual) grupos.push(atual);
+                atual = {
+                    via: via,
+                    vias: match.map(m => m.replace(/<[^>]*>?/gm, '')),
+                    dist: step.distance.value,
+                    tempo: step.duration.value,
+                    texto: step.instructions.split('<div')[0]
                 };
             }
         });
-        if (trechoAtual) segmentosSinteticos.push(trechoAtual);
+        if (atual) grupos.push(atual);
 
-        // Criar os blocos visuais
-        segmentosSinteticos.forEach((seg) => {
-            const km = (seg.distancia / 1000).toFixed(1).replace('.', ',');
-            const horas = Math.floor(seg.duracao / 3600);
-            const minutos = Math.round((seg.duracao % 3600) / 60);
-            const tempoStr = horas > 0 ? `${horas} h ${minutos} min` : `${minutos} min`;
+        grupos.forEach((g) => {
+            const km = (g.dist / 1000).toFixed(1);
+            const h = Math.floor(g.tempo / 3600);
+            const m = Math.round((g.tempo % 3600) / 60);
+            const tStr = h > 0 ? `${h} h ${m} min` : `${m} min`;
 
-            // Formatação: "Siga pela [Rodovia] via [Conexões]"
-            let descricao = seg.instrucaoBase;
-            if (seg.viasNoTrecho.length > 1) {
-                descricao = `Pegue a <b>${seg.via}</b> via ${seg.viasNoTrecho.slice(1, 4).join(', ')}`;
+            let displayTxt = g.texto;
+            if(g.vias.length > 1) {
+                displayTxt = `Siga pela <b>${g.via}</b> via ${g.vias.slice(1,3).join(', ')}`;
             }
 
-            htmlFinal += `
-                <div style="display: flex; gap: 12px; margin-bottom: 25px; align-items: flex-start;">
-                    <div style="color: #94a3b8; font-size: 18px; line-height: 1;"></div>
+            htmlContent += `
+                <div style="display: flex; gap: 15px; margin-bottom: 22px; align-items: flex-start; border-left: 2px solid #e2e8f0; padding-left: 15px; margin-left: 5px;">
+                    <div style="color: #cbd5e1; font-size: 18px;"></div>
                     <div style="flex: 1;">
-                        <div style="font-size: 14px; color: #1e293b; line-height: 1.5;">${descricao}</div>
-                        <div style="font-size: 12px; color: #64748b; margin-top: 4px; font-weight: 500;">${tempoStr} (${km} km)</div>
+                        <div style="font-size: 13.5px; line-height: 1.4;">${displayTxt}</div>
+                        <div style="font-size: 12px; color: #64748b; margin-top: 4px; font-weight: bold;">${tStr} (${km} km)</div>
                     </div>
                 </div>
             `;
         });
 
-        // Cidade de Destino (Ex: João Pessoa)
-        htmlFinal += `
-            <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #e2e8f0;">
-                <div style="font-weight: bold; font-size: 16px; color: #1e293b;">${leg.end_address.split(',')[0]}</div>
-                <div style="font-size: 12px; color: #64748b;">${leg.end_address.split(',').slice(1).join(',')}</div>
+        // DESTINO
+        htmlContent += `
+            <div style="margin-top: 15px; padding-top: 15px; border-top: 2px solid #f1f5f9;">
+                <div style="font-weight: 800; font-size: 15px; color: #2563eb; text-transform: uppercase;">${leg.end_address.split(',')[0]}</div>
+                <div style="font-size: 11px; color: #94a3b8;">${leg.end_address}</div>
             </div>
         `;
     });
 
-    htmlFinal += `</div>`;
-    listaEscrita.innerHTML = htmlFinal;
+    htmlContent += `</div>`;
+    
+    // INJEÇÃO FINAL
+    listaEscrita.innerHTML = htmlContent;
 
-    // Atualizar financeiro após processar rota
-    atualizarFinanceiro();
+    if (typeof atualizarFinanceiro === "function") atualizarFinanceiro();
 }
 
-// --- LÓGICA FINANCEIRA ---
+// --- RESTO DO CÓDIGO (FINANCEIRO E FROTA) MANTIDOS ---
 
 function atualizarFinanceiro() {
     const kmTotal = (distRotaMetros / 1000);
@@ -258,8 +254,6 @@ function atualizarFinanceiro() {
     if(document.getElementById("visual-vazio")) document.getElementById("visual-vazio").style.width = pVazio + "%";
 }
 
-// --- GESTÃO DE PARADAS (WAYPOINTS) ---
-
 function adicionarParada() {
     const container = document.getElementById("container-paradas");
     const div = document.createElement("div");
@@ -272,13 +266,10 @@ function adicionarParada() {
     new google.maps.places.Autocomplete(div.querySelector("input"));
 }
 
-// --- GESTÃO DE FROTA ---
-
 function salvarVeiculo() {
     const nome = document.getElementById("f-nome").value;
     const placa = document.getElementById("f-placa").value;
     if(!nome || !placa) return;
-
     const v = {
         id: Date.now(),
         nome, placa,
@@ -294,14 +285,13 @@ function salvarVeiculo() {
 
 function renderFrota() {
     const list = document.getElementById("lista-frota");
+    if(!list) return;
     list.innerHTML = "";
     frota.forEach(v => {
         const div = document.createElement("div");
         div.className = "veiculo-card";
         div.innerHTML = `
-            <div>
-                <strong>${v.nome}</strong><br><small>${v.placa}</small>
-            </div>
+            <div><strong>${v.nome}</strong><br><small>${v.placa}</small></div>
             <button onclick="selecionarVeiculo(${v.id})" style="padding:5px 10px; font-size:10px;">Selecionar</button>
             <button onclick="excluirVeiculo(${v.id})" style="padding:5px 10px; font-size:10px; background:red;">×</button>
         `;
