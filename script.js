@@ -1,4 +1,4 @@
-let map, directionsRenderer, directionsService, paradasData = {}, rotaIniciada = false;
+let map, directionsRenderer, directionsService, paradasData = {}, rotaIniciada = true;
 let distVazioMetros = 0, distRotaMetros = 0;
 let frota = JSON.parse(localStorage.getItem('frota_db')) || [];
 
@@ -20,7 +20,10 @@ function toggleFrota() {
 
 function toggleGoogleMaps() {
     const painel = document.getElementById('painel-roteiro-escrito');
-    if(painel) painel.classList.toggle('active');
+    if(painel) {
+        painel.classList.toggle('active');
+        localStorage.setItem('layout_roteiro', painel.classList.contains('active'));
+    }
     
     setTimeout(() => { 
         if(typeof google !== 'undefined' && map) {
@@ -33,12 +36,12 @@ function toggleCustos() {
     const body = document.body;
     const painelCustos = document.getElementById('painel-custos-extra');
     
-    // Toggle da classe no body para o CSS reorganizar as colunas (25% cada)
     body.classList.toggle('custos-open');
+    const isOpen = body.classList.contains('custos-open');
+    localStorage.setItem('layout_custos', isOpen);
     
-    // Mostra ou esconde o painel
     if (painelCustos) {
-        if (body.classList.contains('custos-open')) {
+        if (isOpen) {
             painelCustos.style.display = 'block';
             carregarSelectFrota();
         } else {
@@ -46,12 +49,25 @@ function toggleCustos() {
         }
     }
 
-    // ESSENCIAL: Força o Google Maps a recalcular o tamanho baseado no novo espaço da div
     setTimeout(() => {
         if (typeof google !== 'undefined' && map) {
             google.maps.event.trigger(map, 'resize');
         }
     }, 300);
+}
+
+function restaurarLayout() {
+    const roteiroAberto = localStorage.getItem('layout_roteiro') === 'true';
+    const custosAberto = localStorage.getItem('layout_custos') === 'true';
+
+    if (roteiroAberto) {
+        document.getElementById('painel-roteiro-escrito')?.classList.add('active');
+    }
+    if (custosAberto) {
+        document.body.classList.add('custos-open');
+        const p = document.getElementById('painel-custos-extra');
+        if (p) p.style.display = 'block';
+    }
 }
 
 function limparPainelCustos() {
@@ -106,6 +122,7 @@ function initMap() {
 
     directionsRenderer.setMap(map);
     setupAutocomplete();
+    restaurarLayout();
 }
 
 function setupAutocomplete() {
@@ -126,7 +143,6 @@ function calcularRota() {
         return;
     }
 
-    // Agora permitimos os cálculos financeiros
     rotaIniciada = true;
 
     if(pontoVazio) {
@@ -236,7 +252,6 @@ function parseMoeda(valor) {
 }
 
 function atualizarFinanceiro() {
-    // BLOQUEIO: Não faz nada até o primeiro clique em Calcular Rota
     if (!rotaIniciada) return;
 
     const kmTotal = (distRotaMetros / 1000);
