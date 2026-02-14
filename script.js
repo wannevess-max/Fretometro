@@ -34,11 +34,11 @@ function toggleAparelhoFrio() {
     const div = document.getElementById("div-aparelho-frio");
     const rowAn = document.getElementById("row-an-frio");
     if(tipo === "frigorificada") {
-        div.style.display = "block";
-        rowAn.style.display = "flex";
+        if(div) div.style.display = "block";
+        if(rowAn) rowAn.style.display = "flex";
     } else {
-        div.style.display = "none";
-        rowAn.style.display = "none";
+        if(div) div.style.display = "none";
+        if(rowAn) rowAn.style.display = "none";
     }
     atualizarFinanceiro();
 }
@@ -46,7 +46,7 @@ function toggleAparelhoFrio() {
 // --- LÓGICA DO MAPA ---
 
 function initMap() {
-    // PROTEÇÃO CONTRA O ERRO DE CONSOLE:
+    // Verificação para evitar erro de 'google is not defined'
     if (typeof google === 'undefined') {
         console.log("Aguardando Google Maps carregar...");
         setTimeout(initMap, 500);
@@ -128,8 +128,6 @@ function executarRotaPrincipal(origem, destino) {
     });
 }
 
-// --- FUNÇÃO PARA PROCESSAR O ROTEIRO (SINTÉTICO / RESUMIDO) ---
-
 function processarSegmentosRota(res) {
     const route = res.routes[0];
     const legs = route.legs;
@@ -138,9 +136,7 @@ function processarSegmentosRota(res) {
     let html = `<div style="padding: 10px; font-family: sans-serif; color: #1e293b;">`;
 
     legs.forEach((leg) => {
-        // Cidade de Partida
         html += `<div style="font-weight: bold; font-size: 15px; margin-bottom: 15px; color: #2563eb;">${leg.start_address.split(',')[0]}</div>`;
-
         let resumoAgrupado = [];
         let itemAtual = null;
 
@@ -148,7 +144,6 @@ function processarSegmentosRota(res) {
             const matches = step.instructions.match(/<b>(.*?)<\/b>/g) || [];
             const viaPrincipal = matches[0] ? matches[0].replace(/<[^>]*>?/gm, '') : "Vias locais";
 
-            // Agrupamento Sintético (Igual ao resumo do Google)
             if (itemAtual && (itemAtual.via === viaPrincipal || step.distance.value < 15000)) {
                 itemAtual.distancia += step.distance.value;
                 itemAtual.duracao += step.duration.value;
@@ -180,20 +175,13 @@ function processarSegmentosRota(res) {
                 </div>`;
         });
 
-        // Cidade de Destino
         html += `<div style="font-weight: bold; font-size: 15px; margin-top: 5px; color: #2563eb;">${leg.end_address.split(',')[0]}</div>`;
         html += `<div style="font-size: 11px; color: #94a3b8; margin-bottom: 20px;">${leg.end_address}</div>`;
     });
 
     html += `</div>`;
-
-    if (listaEscrita) {
-        listaEscrita.innerHTML = html;
-    }
-    
-    if (typeof atualizarFinanceiro === "function") {
-        atualizarFinanceiro();
-    }
+    if (listaEscrita) listaEscrita.innerHTML = html;
+    atualizarFinanceiro();
 }
 
 // --- LÓGICA FINANCEIRA ---
@@ -203,23 +191,24 @@ function atualizarFinanceiro() {
     const kmVazio = (distVazioMetros / 1000);
     const kmGeral = kmTotal + kmVazio;
 
-    const dieselL = parseFloat(document.getElementById("custoDieselLitro").value) || 0;
-    const consumoM = parseFloat(document.getElementById("consumoDieselMedia").value) || 0;
-    const arlaL = parseFloat(document.getElementById("custoArlaLitro").value) || 0;
-    const arlaP = (parseFloat(document.getElementById("arlaPorcentagem").value) || 0) / 100;
-    const pedagio = parseFloat(document.getElementById("custoPedagio").value) || 0;
-    const manutKm = parseFloat(document.getElementById("custoManutencaoKm").value) || 0;
-    const freteBase = parseFloat(document.getElementById("valorFrete").value) || 0;
-    const impostoP = (parseFloat(document.getElementById("porcentagemImposto").value) || 0) / 100;
+    const dieselL = parseFloat(document.getElementById("custoDieselLitro")?.value) || 0;
+    const consumoM = parseFloat(document.getElementById("consumoDieselMedia")?.value) || 0;
+    const arlaL = parseFloat(document.getElementById("custoArlaLitro")?.value) || 0;
+    const arlaP = (parseFloat(document.getElementById("arlaPorcentagem")?.value) || 0) / 100;
+    const pedagio = parseFloat(document.getElementById("custoPedagio")?.value) || 0;
+    const manutKm = parseFloat(document.getElementById("custoManutencaoKm")?.value) || 0;
+    const freteBase = parseFloat(document.getElementById("valorFrete")?.value) || 0;
+    const impostoP = (parseFloat(document.getElementById("porcentagemImposto")?.value) || 0) / 100;
 
     const custoCombustivel = consumoM > 0 ? (kmGeral / consumoM) * dieselL : 0;
     const custoArla = consumoM > 0 ? ((kmGeral / consumoM) * arlaP) * arlaL : 0;
     const custoManut = kmGeral * manutKm;
     
     let custoFrio = 0;
-    if(document.getElementById("tipoCarga").value === "frigorificada") {
-        const horas = parseFloat(document.getElementById("horasFrio").value) || 0;
-        const consH = parseFloat(document.getElementById("consumoFrioHora").value) || 0;
+    const tipoCargaEl = document.getElementById("tipoCarga");
+    if(tipoCargaEl && tipoCargaEl.value === "frigorificada") {
+        const horas = parseFloat(document.getElementById("horasFrio")?.value) || 0;
+        const consH = parseFloat(document.getElementById("consumoFrioHora")?.value) || 0;
         custoFrio = horas * consH * dieselL;
     }
 
@@ -271,16 +260,16 @@ function adicionarParada() {
 // --- GESTÃO DE FROTA ---
 
 function salvarVeiculo() {
-    const nome = document.getElementById("f-nome").value;
-    const placa = document.getElementById("f-placa").value;
+    const nome = document.getElementById("f-nome")?.value;
+    const placa = document.getElementById("f-placa")?.value;
     if(!nome || !placa) return;
 
     const v = {
         id: Date.now(),
         nome, placa,
-        diesel: document.getElementById("f-diesel").value,
-        media: document.getElementById("f-media").value,
-        manut: document.getElementById("f-manut").value
+        diesel: document.getElementById("f-diesel")?.value,
+        media: document.getElementById("f-media")?.value,
+        manut: document.getElementById("f-manut")?.value
     };
     frota.push(v);
     localStorage.setItem('frota_db', JSON.stringify(frota));
