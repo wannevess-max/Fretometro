@@ -29,17 +29,38 @@ function toggleGoogleMaps() {
     }, 300);
 }
 
-// CORREÇÃO: Função para gerenciar a exibição do painel de custos extra
+/**
+ * IMPLEMENTAÇÃO SOLICITADA:
+ * Gerencia a visibilidade do painel de custos ocupando 25% da tela.
+ * Adiciona a classe 'custos-visible' ao body para que o CSS possa redimensionar o layout.
+ */
 function toggleCustos() {
+    const body = document.body;
     const painelExtra = document.getElementById('painel-custos-extra');
+    const sidebarPadrao = document.querySelector('.sidebar');
+    
     if (!painelExtra) return;
 
-    if (painelExtra.style.display === 'block') {
-        painelExtra.style.display = 'none';
-    } else {
+    // Toggle da classe de controle de layout no Body
+    body.classList.toggle('custos-open');
+
+    if (body.classList.contains('custos-open')) {
+        // MOSTRAR PAINEL
         painelExtra.style.display = 'block';
-        carregarSelectFrota(); 
+        if (sidebarPadrao) sidebarPadrao.style.display = 'none';
+        carregarSelectFrota();
+    } else {
+        // ESCONDER PAINEL
+        painelExtra.style.display = 'none';
+        if (sidebarPadrao) sidebarPadrao.style.display = 'block';
     }
+
+    // Redimensiona o mapa para ajustar ao novo espaço de 75%
+    setTimeout(() => {
+        if (typeof google !== 'undefined' && map) {
+            google.maps.event.trigger(map, 'resize');
+        }
+    }, 300);
 }
 
 function limparPainelCustos() {
@@ -74,7 +95,6 @@ function toggleAparelhoFrio() {
 // --- LÓGICA DO MAPA ---
 
 function initMap() {
-    // CORREÇÃO: Tratamento para carregamento assíncrono do Google Maps
     if (typeof google === 'undefined' || typeof google.maps === 'undefined') {
         return; 
     }
