@@ -34,6 +34,7 @@ body, html {
     overflow: hidden; 
 }
 
+/* CORREÇÃO AQUI: Wrapper em Flex para alinhar colunas lado a lado */
 .wrapper { 
     display: flex; 
     height: 100vh; 
@@ -50,7 +51,7 @@ body, html {
     height: 50px; 
     background: var(--bg-sidebar);
     border-bottom: 1px solid var(--border-color); 
-    z-index: 1000; /* Aumentado para ficar sempre visível acima dos painéis */
+    z-index: 1000;
     display: flex; 
     align-items: center; 
     padding: 0 20px; 
@@ -73,7 +74,7 @@ body, html {
     color: var(--accent); 
 }
 
-/* SIDEBARS */
+/* CORREÇÃO AQUI: flex-shrink: 0 impede que as colunas sejam espremidas */
 .sidebar { 
     width: 25%; 
     min-width: 320px; 
@@ -83,7 +84,7 @@ body, html {
     overflow-y: auto; 
     z-index: 10; 
     border-right: 1px solid var(--border-color);
-    flex-shrink: 0; /* Impede que a coluna seja espremida pelo mapa */
+    flex-shrink: 0; 
 }
 
 #painel-custos-extra {
@@ -98,7 +99,7 @@ body, html {
     flex-shrink: 0;
 }
 
-/* Regra para quando o painel de custos está aberto (JS adiciona a classe no body) */
+/* Regra para quando o painel de custos está aberto */
 body.custos-open #painel-custos-extra {
     display: block;
 }
@@ -111,7 +112,7 @@ body.custos-open #painel-custos-extra {
     width: 50%; 
     height: 100%; 
     background: var(--bg-sidebar); 
-    z-index: 1200; /* Acima do mapa e das sidebars */
+    z-index: 1200; 
     border-left: 1px solid var(--border-color);
     padding: 40px; 
     transition: right 0.5s cubic-bezier(0.16, 1, 0.3, 1);
@@ -121,7 +122,7 @@ body.custos-open #painel-custos-extra {
 }
 #painel-frota.active { right: 0; }
 
-/* ÁREA DO MAPA E ROTEIRO */
+/* CORREÇÃO AQUI: flex-grow: 1 faz o mapa ocupar o resto do espaço automaticamente */
 .map-container { 
     flex-grow: 1; 
     height: 100%; 
@@ -129,7 +130,7 @@ body.custos-open #painel-custos-extra {
     flex-direction: column; 
     position: relative; 
     overflow: hidden; 
-    transition: all 0.3s ease; /* Transição suave ao abrir os custos */
+    transition: all 0.3s ease;
 }
 
 #map { 
