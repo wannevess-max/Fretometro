@@ -305,50 +305,42 @@ function processarSegmentosRota(res) {
 
     legs.forEach((leg, legIndex) => {
         const isVazio = (temSaida && legIndex === 0);
+        
+        // --- EXTRAÇÃO DA CIDADE BASE DO TRECHO ---
+        let cidadeTrecho = "Rota";
+        let ufTrecho = "";
+        const partesEnd = leg.start_address.split(',');
+        if (partesEnd.length >= 2) {
+            const localidade = partesEnd[partesEnd.length - 2].trim();
+            const ufMatch = localidade.match(/([A-Z]{2})$/);
+            if (ufMatch) {
+                ufTrecho = ufMatch[1];
+                cidadeTrecho = localidade.replace('-', '/').trim();
+            }
+        }
 
         leg.steps.forEach((step) => {
             const instrucaoHTML = step.instructions;
-            
-            // --- 1. EXTRAÇÃO DE CIDADE E UF ---
-            // Buscamos no endereço final do passo para ser mais preciso por trecho
-            let cidadeUF = "Rota"; 
-            let ufAtual = "";
-            
-            // Tenta capturar do endereço do "leg" (mais confiável para Cidade/UF)
-            const partesEnd = leg.start_address.split(',');
-            if (partesEnd.length >= 2) {
-                const localidade = partesEnd[partesEnd.length - 2].trim(); // Ex: "Jundiaí - SP"
-                const matchUf = localidade.match(/([A-Z]{2})$/);
-                if (matchUf) {
-                    ufAtual = matchUf[1];
-                    cidadeUF = localidade.replace('-', '/').trim();
-                }
-            }
 
-            // --- 2. LINHA DE DIVISA DE ESTADO ---
-            if (ufAtual && estadoAnterior && ufAtual !== estadoAnterior) {
+            // --- LÓGICA DE DIVISA DE ESTADO ---
+            if (ufTrecho && estadoAnterior && ufTrecho !== estadoAnterior) {
                 html += `
-                    <tr style="background: #eee; font-weight: bold; border-top: 1px solid #000; border-bottom: 1px solid #000;">
-                        <td style="padding: 4px;">${ufAtual}</td>
+                    <tr style="background: #e2e8f0; font-weight: bold; border-top: 1px solid #000; border-bottom: 1px solid #000;">
+                        <td style="padding: 4px;">${ufTrecho}</td>
                         <td colspan="3" style="padding: 4px; text-align: center; letter-spacing: 2px;">
                             -------------------------- DIVISA DE ESTADO --------------------------
                         </td>
                         <td style="padding: 4px; text-align: right;">----------</td>
                     </tr>`;
             }
-            estadoAnterior = ufAtual;
+            estadoAnterior = ufTrecho;
 
-            // --- 3. EXTRAÇÃO DA VIA (REFERÊNCIA) ---
+            // --- EXTRAÇÃO DA VIA (REFERÊNCIA) ---
             let viaRef = "Acesso";
-            
-            // Procura siglas como BR-116, SP-330
-            const regexVia = /\b([A-Z]{2}-\d{3})\b/;
-            const matchVia = instrucaoHTML.match(regexVia);
-            
+            const matchVia = instrucaoHTML.match(/\b([A-Z]{2}-\d{3})\b/);
             if (matchVia) {
                 viaRef = matchVia[1];
             } else {
-                // Se não achar sigla, tenta pegar o que está em negrito (geralmente nome de Rodovia)
                 const negritos = instrucaoHTML.match(/<b>(.*?)<\/b>/g);
                 if (negritos) {
                     for (let n of negritos) {
@@ -361,17 +353,14 @@ function processarSegmentosRota(res) {
                 }
             }
 
-            // --- 4. NOME DO TRECHO (LIMPEZA) ---
-            // Removemos as tags HTML e limpamos termos repetitivos
-            let trechoNome = instrucaoHTML.replace(/<[^>]*>?/gm, '');
-            if (trechoNome.length > 80) trechoNome = trechoNome.substring(0, 77) + "...";
+            const instrucaoLimpa = instrucaoHTML.replace(/<[^>]*>?/gm, '');
 
             html += `
                 <tr style="border-bottom: 1px solid #eee; ${isVazio ? 'background: #fffbeb;' : ''}">
                     <td style="padding: 6px;">${globalSeq}</td>
-                    <td style="padding: 6px;">${cidadeUF}</td>
+                    <td style="padding: 6px;">${cidadeTrecho}</td>
                     <td style="padding: 6px; font-weight: bold; color: #1a56db;">${viaRef}</td>
-                    <td style="padding: 6px; color: #444;">${trechoNome}</td>
+                    <td style="padding: 6px; color: #444;">${instrucaoLimpa}</td>
                     <td style="padding: 6px; text-align: right; font-weight: bold;">${step.distance.text}</td>
                 </tr>`;
             globalSeq++;
@@ -495,6 +484,7 @@ window.onload = () => {
     script.defer = true;
     document.head.appendChild(script);
 };
+
 
 
 
