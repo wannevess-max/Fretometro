@@ -262,11 +262,12 @@ function calcularRota() {
 
 // --- LOGICA DE TABELA DE 5 COLUNAS CORRIGIDA ---
 
-function processarSegmentosRota(res) {
+{
     const legs = res.routes[0].legs;
     const listaEscrita = document.getElementById("lista-passo-a-passo");
     const temSaida = document.getElementById("saida").value;
 
+    // Atualiza distâncias para os cálculos financeiros que já existem no seu código
     if (temSaida && legs.length >= 2) {
         distVazioMetros = legs[0].distance.value;
         distRotaMetros = legs.slice(1).reduce((acc, leg) => acc + leg.distance.value, 0);
@@ -276,14 +277,14 @@ function processarSegmentosRota(res) {
     }
 
     let html = `
-        <table class="tabela-roteiro">
+        <table class="tabela-roteiro" style="width:100%; border-collapse: collapse; font-family: sans-serif;">
             <thead>
-                <tr>
-                    <th style="width: 50px;">Seq</th>
-                    <th style="width: 150px;">Estrada / Cidade</th>
-                    <th style="width: 130px;">Referência (Via)</th>
-                    <th>Nome do Trecho</th>
-                    <th style="text-align: right; width: 80px;">KM</th>
+                <tr style="background: #f1f5f9; text-align: left;">
+                    <th style="width: 40px; padding: 8px; border-bottom: 2px solid #ddd;">Seq</th>
+                    <th style="width: 160px; padding: 8px; border-bottom: 2px solid #ddd;">Estrada / Cidade</th>
+                    <th style="width: 140px; padding: 8px; border-bottom: 2px solid #ddd;">Referência (Via)</th>
+                    <th style="padding: 8px; border-bottom: 2px solid #ddd;">Nome do Trecho</th>
+                    <th style="width: 70px; padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">KM</th>
                 </tr>
             </thead>
             <tbody>`;
@@ -294,13 +295,12 @@ function processarSegmentosRota(res) {
     legs.forEach((leg, legIndex) => {
         const isVazio = (temSaida && legIndex === 0);
         
-        // Extração de Cidade e UF baseada no endereço reverso do Google para este trecho
+        // Identificação de Cidade e Estado
         const partesEnd = leg.start_address.split(',');
         let cidadeUF = "Rota";
         let ufAtual = "";
 
         if (partesEnd.length >= 3) {
-            // Tenta pegar o padrão "Cidade - UF" que geralmente é o antepenúltimo item
             const trechoLocal = partesEnd[partesEnd.length - 3].trim();
             cidadeUF = trechoLocal;
             const ufMatch = trechoLocal.match(/\b([A-Z]{2})\b/);
@@ -311,40 +311,39 @@ function processarSegmentosRota(res) {
             const instrucaoHTML = step.instructions;
             const instrucaoLimpa = instrucaoHTML.replace(/<[^>]*>?/gm, '');
 
-            // Lógica de Alerta de Mudança de Estado
+            // Divisória de Estado (Apenas se mudar a UF)
             if (ufAtual && estadoAnterior && ufAtual !== estadoAnterior) {
                 html += `
-                    <tr style="background: #1e293b; color: #ffffff; font-weight: bold;">
-                        <td colspan="5" style="padding: 12px; text-align: center; border: none; letter-spacing: 3px;">
-                            ENTRANDO NO ESTADO: ${ufAtual} __________________________________________________
+                    <tr style="background: #0f172a; color: #ffffff; font-weight: bold;">
+                        <td colspan="5" style="padding: 10px; text-align: center; font-size: 12px; letter-spacing: 2px;">
+                            ENTRANDO EM: ${ufAtual} ——————————————————————————————————
                         </td>
                     </tr>`;
             }
             estadoAnterior = ufAtual;
 
-            // Extração de Referência (Via) - Filtrando comandos de direção
-            let referenciaVia = "Urbano";
-            const viaMatch = instrucaoHTML.match(/\b([A-Z]{2}-\d{3,4})\b/); // Busca BR-116, SP-330, etc
-            const negritoMatch = instrucaoHTML.match(/<b>(.*?)<\/b>/);
+            // Extração da Via (Evitando comandos como "Vire" ou "Mantenha")
+            let viaRef = "Acesso";
+            const viaSigla = instrucaoHTML.match(/\b([A-Z]{2}-\d{3,4})\b/); 
+            const textoNegrito = instrucaoHTML.match(/<b>(.*?)<\/b>/);
 
-            if (viaMatch) {
-                referenciaVia = viaMatch[1];
-            } else if (negritoMatch) {
-                const bText = negritoMatch[1].replace(/<[^>]*>?/gm, '');
-                // Só aceita se NÃO for um comando de direção comum
-                const comandos = /Vire|Mantenha|Siga|Curva|Saída|Esquerda|Direita|Direção/i;
-                if (!comandos.test(bText)) {
-                    referenciaVia = bText;
+            if (viaSigla) {
+                viaRef = viaSigla[1];
+            } else if (textoNegrito) {
+                const bText = textoNegrito[1].replace(/<[^>]*>?/gm, '');
+                // Filtro para não pegar direções na coluna de referência
+                if (!/Vire|Mantenha|Siga|Curva|Saída|Esquerda|Direita/i.test(bText)) {
+                    viaRef = bText;
                 }
             }
 
             html += `
-                <tr style="${isVazio ? 'background: rgba(245, 158, 11, 0.1);' : ''}">
-                    <td style="font-weight: bold; color: #94a3b8;">${globalSeq}</td>
-                    <td style="font-weight: 600; font-size: 11px;">${cidadeUF}</td>
-                    <td style="color: #2563eb; font-weight: bold; font-size: 11px;">${referenciaVia}</td>
-                    <td style="font-size: 12px;">${instrucaoLimpa}</td>
-                    <td style="text-align: right; font-weight: bold; font-size: 11px;">${step.distance.text}</td>
+                <tr style="border-bottom: 1px solid #eee; ${isVazio ? 'background: #fffbeb;' : ''}">
+                    <td style="padding: 6px 8px; font-size: 11px; color: #666;">${globalSeq}</td>
+                    <td style="padding: 6px 8px; font-size: 11px; font-weight: 600;">${cidadeUF}</td>
+                    <td style="padding: 6px 8px; font-size: 11px; font-weight: bold; color: #2563eb;">${viaRef}</td>
+                    <td style="padding: 6px 8px; font-size: 12px;">${instrucaoLimpa}</td>
+                    <td style="padding: 6px 8px; font-size: 11px; font-weight: bold; text-align: right;">${step.distance.text}</td>
                 </tr>`;
             globalSeq++;
         });
@@ -352,11 +351,12 @@ function processarSegmentosRota(res) {
 
     html += `</tbody></table>`;
     
+    // Mantém a chamada do financeiro original
     const totalKm = ((distVazioMetros + distRotaMetros) / 1000).toFixed(1);
     html += `
-        <div class="roteiro-footer" style="margin-top: 15px; padding: 15px; background: #f8fafc; border-top: 2px solid #e2e8f0;">
-            <div style="color: #64748b; font-size: 10px; font-weight: bold;">RELATÓRIO DE VIAGEM OPERACIONAL</div>
-            <div style="font-size: 18px; color: #0f172a;">KILOMETRAGEM TOTAL: <strong>${totalKm.replace('.', ',')} km</strong></div>
+        <div style="margin-top: 10px; padding: 10px; border-top: 2px solid #334155; font-weight: bold; display: flex; justify-content: space-between;">
+            <span>RELATÓRIO OPERACIONAL</span>
+            <span>TOTAL: ${totalKm.replace('.', ',')} KM</span>
         </div>`;
 
     listaEscrita.innerHTML = html;
@@ -458,4 +458,5 @@ window.onload = () => {
     script.async = true;
     document.head.appendChild(script);
 };
+
 
