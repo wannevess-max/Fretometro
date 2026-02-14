@@ -128,68 +128,74 @@ function processarSegmentosRota(res) {
     const legs = route.legs;
     const listaEscrita = document.getElementById("lista-passo-a-passo");
     
-    let html = `<div style="padding: 15px; font-family: sans-serif;">`;
+    if (!listaEscrita) return;
 
-    legs.forEach((leg, index) => {
-        // Nome da Origem do Leg
-        html += `<div style="font-weight: bold; font-size: 16px; margin-bottom: 20px;">${leg.start_address.split(',')[0]}</div>`;
+    // Cabeçalho do Relatório
+    let html = `
+        <div style="padding: 20px; color: #1e293b; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+            <div style="border-bottom: 2px solid #2563eb; padding-bottom: 10px; margin-bottom: 20px;">
+                <h3 style="margin:0; color: #2563eb;">Relatório Sintético de Rota</h3>
+                <small style="color: #64748b;">Baseado em dados do Google Maps</small>
+            </div>
+    `;
+
+    legs.forEach((leg) => {
+        // Ponto de Partida
+        html += `
+            <div style="margin-bottom: 15px; font-weight: bold; font-size: 14px; display: flex; align-items: center; gap: 10px;">
+                <span style="background: #10b981; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 10px;">A</span>
+                ${leg.start_address}
+            </div>
+        `;
 
         let resumoAgrupado = [];
         let itemAtual = null;
 
         leg.steps.forEach((step) => {
-            const instrucaoHTML = step.instructions;
-            // Extrai termos em negrito (Rodovias/Cidades)
-            const partesNegrito = (instrucaoHTML.match(/<b>(.*?)<\/b>/g) || [])
-                                   .map(t => t.replace(/<[^>]*>?/gm, ''));
-            
-            const viaPrincipal = partesNegrito[0] || "Vias locais";
+            // Extraímos as rodovias principais (em negrito)
+            const matches = step.instructions.match(/<b>(.*?)<\/b>/g) || [];
+            const viaPrincipal = matches[0] ? matches[0].replace(/<[^>]*>?/gm, '') : "Vias locais";
 
-            // Lógica de agrupamento: Agrupa steps que pertencem à mesma via principal
-            // ou que são trechos curtos (< 10km) para evitar poluição no relatório
-            if (itemAtual && (itemAtual.via === viaPrincipal || step.distance.value < 10000)) {
+            // Se o trecho for longo ou continuar na mesma via, acumulamos (Igual ao resumo sintetico)
+            if (itemAtual && (itemAtual.via === viaPrincipal || step.distance.value < 15000)) {
                 itemAtual.distancia += step.distance.value;
                 itemAtual.duracao += step.duration.value;
-                // Adiciona novas vias mencionadas ao "via Rod. X, Rod. Y"
-                partesNegrito.forEach(p => {
-                    if (!itemAtual.viasSecundarias.includes(p)) itemAtual.viasSecundarias.push(p);
-                });
             } else {
                 if (itemAtual) resumoAgrupado.push(itemAtual);
                 itemAtual = {
                     via: viaPrincipal,
-                    viasSecundarias: [...partesNegrito],
+                    instrucao: step.instructions.split('<div')[0], // Limpa avisos de trânsito
                     distancia: step.distance.value,
-                    duracao: step.duration.value,
-                    textoOriginal: instrucaoHTML
+                    duracao: step.duration.value
                 };
             }
         });
         if (itemAtual) resumoAgrupado.push(itemAtual);
 
-        // Renderização dos Blocos Sintéticos
+        // Renderização dos Itens do Resumo
         resumoAgrupado.forEach((bloco) => {
             const km = (bloco.distancia / 1000).toFixed(1).replace('.', ',');
             const horas = Math.floor(bloco.duracao / 3600);
             const minutos = Math.round((bloco.duracao % 3600) / 60);
-            const tempoStr = horas > 0 ? `${horas} h ${minutos} min` : `${minutos} min`;
+            const tempoStr = horas > 0 ? `${horas}h ${minutos}min` : `${minutos}min`;
 
-            // Formatação do texto similar ao print: "Pegue a [Via] via [Secundarias]"
-            let tituloTrecho = bloco.textoOriginal.split('<div')[0]; // Remove avisos de trânsito se houver
-            
             html += `
-                <div style="display: flex; gap: 15px; margin-bottom: 25px; align-items: flex-start;">
-                    <div style="color: #5f6368; font-size: 20px;"></div>
-                    <div>
-                        <div style="font-size: 14px; color: #202124; line-height: 1.4;">${tituloTrecho}</div>
-                        <div style="font-size: 13px; color: #70757a; margin-top: 4px;">${tempoStr} (${km} km)</div>
+                <div style="display: flex; gap: 15px; margin-bottom: 20px; border-left: 2px solid #e2e8f0; padding-left: 15px; margin-left: 11px;">
+                    <div style="flex-grow: 1;">
+                        <div style="font-size: 13px; color: #1e293b; margin-bottom: 4px; line-height: 1.5;">${bloco.instrucao}</div>
+                        <div style="font-size: 11px; color: #64748b; font-weight: 600;">${tempoStr} (${km} km)</div>
                     </div>
-                </div>`;
+                </div>
+            `;
         });
 
-        // Nome do Destino Final do Leg
-        html += `<div style="font-weight: bold; font-size: 16px; margin-top: 10px;">${leg.end_address.split(',')[0]}</div>`;
-        html += `<div style="color: #70757a; font-size: 12px; margin-bottom: 20px;">${leg.end_address.split(',').slice(1).join(',')}</div>`;
+        // Ponto de Chegada
+        html += `
+            <div style="margin-top: 10px; font-weight: bold; font-size: 14px; display: flex; align-items: center; gap: 10px;">
+                <span style="background: #ef4444; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 10px;">B</span>
+                ${leg.end_address}
+            </div>
+        `;
     });
 
     html += `</div>`;
