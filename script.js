@@ -288,14 +288,14 @@ function processarSegmentosRota(res) {
     }
 
     let html = `
-        <table class="tabela-roteiro" style="width:100%; border-collapse: collapse; font-family: Arial, sans-serif; font-size: 12px;">
+        <table class="tabela-roteiro" style="width:100%; border-collapse: collapse; font-family: Arial, sans-serif; font-size: 11px;">
             <thead>
                 <tr style="background: #f1f1f1; border-bottom: 2px solid #333;">
-                    <th style="width: 40px; padding: 8px; text-align: left;">Seq</th>
-                    <th style="width: 160px; padding: 8px; text-align: left;">Estrada / Cidade</th>
-                    <th style="width: 130px; padding: 8px; text-align: left;">Referência (Via)</th>
-                    <th style="padding: 8px; text-align: left;">Nome do Trecho</th>
-                    <th style="width: 80px; padding: 8px; text-align: right;">KM</th>
+                    <th style="width: 35px; padding: 6px; text-align: left;">Seq</th>
+                    <th style="width: 140px; padding: 6px; text-align: left;">Estrada / Cidade</th>
+                    <th style="width: 110px; padding: 6px; text-align: left;">Referência (Via)</th>
+                    <th style="padding: 6px; text-align: left;">Nome do Trecho</th>
+                    <th style="width: 65px; padding: 6px; text-align: right;">KM</th>
                 </tr>
             </thead>
             <tbody>`;
@@ -309,69 +309,70 @@ function processarSegmentosRota(res) {
         leg.steps.forEach((step) => {
             const instrucaoHTML = step.instructions;
             
-            // 1. Extração Precisa de Cidade / UF (busca do fim para o começo do endereço)
-            let cidadeUF = "Rota";
+            // --- 1. EXTRAÇÃO DE CIDADE E UF ---
+            // Buscamos no endereço final do passo para ser mais preciso por trecho
+            let cidadeUF = "Rota"; 
             let ufAtual = "";
+            
+            // Tenta capturar do endereço do "leg" (mais confiável para Cidade/UF)
             const partesEnd = leg.start_address.split(',');
             if (partesEnd.length >= 2) {
-                // Pega a penúltima parte (geralmente Cidade - UF)
-                const localidade = partesEnd[partesEnd.length - 2].trim();
-                const ufMatch = localidade.match(/([A-Z]{2})$/); // Pega as duas letras no fim
-                
-                if (ufMatch) {
-                    ufAtual = ufMatch[1];
-                    // Remove o CEP se existir e formata
-                    cidadeUF = localidade.replace(/\d{5}-\d{3}/, '').trim();
-                    if (!cidadeUF.includes('/')) {
-                        cidadeUF = cidadeUF.replace('-', '/').trim();
-                    }
+                const localidade = partesEnd[partesEnd.length - 2].trim(); // Ex: "Jundiaí - SP"
+                const matchUf = localidade.match(/([A-Z]{2})$/);
+                if (matchUf) {
+                    ufAtual = matchUf[1];
+                    cidadeUF = localidade.replace('-', '/').trim();
                 }
             }
 
-            // 2. Lógica da Linha de DIVISA DE ESTADO
+            // --- 2. LINHA DE DIVISA DE ESTADO ---
             if (ufAtual && estadoAnterior && ufAtual !== estadoAnterior) {
                 html += `
                     <tr style="background: #eee; font-weight: bold; border-top: 1px solid #000; border-bottom: 1px solid #000;">
-                        <td style="padding: 5px;">${ufAtual}</td>
-                        <td colspan="3" style="padding: 5px; text-align: center; letter-spacing: 2px;">
+                        <td style="padding: 4px;">${ufAtual}</td>
+                        <td colspan="3" style="padding: 4px; text-align: center; letter-spacing: 2px;">
                             -------------------------- DIVISA DE ESTADO --------------------------
                         </td>
-                        <td style="padding: 5px; text-align: right;">----------</td>
+                        <td style="padding: 4px; text-align: right;">----------</td>
                     </tr>`;
             }
             estadoAnterior = ufAtual;
 
-            // 3. Extração da VIA (Referência)
+            // --- 3. EXTRAÇÃO DA VIA (REFERÊNCIA) ---
             let viaRef = "Acesso";
-            // Tenta achar siglas tipo BR-116 ou SP-330
-            const viaSigla = instrucaoHTML.match(/\b([A-Z]{2}-\d{3})\b/);
             
-            if (viaSigla) {
-                viaRef = viaSigla[1];
+            // Procura siglas como BR-116, SP-330
+            const regexVia = /\b([A-Z]{2}-\d{3})\b/;
+            const matchVia = instrucaoHTML.match(regexVia);
+            
+            if (matchVia) {
+                viaRef = matchVia[1];
             } else {
-                // Se não achar sigla, busca nomes de rodovias em negrito
-                const bTags = instrucaoHTML.match(/<b>(.*?)<\/b>/g);
-                if (bTags) {
-                    for (let tag of bTags) {
-                        let txt = tag.replace(/<[^>]*>?/gm, '');
-                        if (txt.length > 2 && (txt.includes("Rod.") || txt.includes("Rodovia") || txt.includes("Av.") || txt.includes("Via"))) {
-                            viaRef = txt;
+                // Se não achar sigla, tenta pegar o que está em negrito (geralmente nome de Rodovia)
+                const negritos = instrucaoHTML.match(/<b>(.*?)<\/b>/g);
+                if (negritos) {
+                    for (let n of negritos) {
+                        let texto = n.replace(/<[^>]*>?/gm, '');
+                        if (texto.length > 3 && (texto.includes("Rod.") || texto.includes("Rodovia") || texto.includes("Av."))) {
+                            viaRef = texto;
                             break;
                         }
                     }
                 }
             }
 
-            // 4. Limpeza da Instrução Principal
-            const instrucaoLimpa = instrucaoHTML.replace(/<[^>]*>?/gm, '');
+            // --- 4. NOME DO TRECHO (LIMPEZA) ---
+            // Removemos as tags HTML e limpamos termos repetitivos
+            let trechoNome = instrucaoHTML.replace(/<[^>]*>?/gm, '');
+            if (trechoNome.length > 80) trechoNome = trechoNome.substring(0, 77) + "...";
 
             html += `
                 <tr style="border-bottom: 1px solid #eee; ${isVazio ? 'background: #fffbeb;' : ''}">
-                    <td style="padding: 8px;">${globalSeq}</td>
-                    <td style="padding: 8px;">${cidadeUF}</td>
-                    <td style="padding: 8px; font-weight: bold; color: #1a56db;">${viaRef}</td>
-                    <td style="padding: 8px; color: #444;">${instrucaoLimpa}</td>
-                    <td style="padding: 8px; text-align: right; font-weight: bold;">${step.distance.text}</td>
+                    <td style="padding: 6px;">${globalSeq}</td>
+                    <td style="padding: 6px;">${cidadeUF}</td>
+                    <td style="padding: 6px; font-weight: bold; color: #1a56db;">${viaRef}</td>
+                    <td style="padding: 6px; color: #444;">${trechoNome}</td>
+                    <td style="padding: 6px; text-align: right; font-weight: bold;">${step.distance.text}</td>
                 </tr>`;
             globalSeq++;
         });
@@ -381,9 +382,9 @@ function processarSegmentosRota(res) {
     
     const totalKm = ((distVazioMetros + distRotaMetros) / 1000).toFixed(1);
     html += `
-        <div style="margin-top: 15px; padding: 12px; border: 1px solid #ccc; background: #f9f9f9; display: flex; justify-content: space-between; font-weight: bold; font-family: sans-serif;">
-            <span style="color: #666;">RELATÓRIO DE VIAGEM OPERACIONAL</span>
-            <span style="font-size: 14px;">KILOMETRAGEM TOTAL: ${totalKm.replace('.', ',')} km</span>
+        <div style="margin-top: 10px; padding: 10px; border: 1px solid #000; display: flex; justify-content: space-between; font-weight: bold;">
+            <span>RELATÓRIO DE VIAGEM OPERACIONAL</span>
+            <span>KILOMETRAGEM TOTAL: ${totalKm.replace('.', ',')} km</span>
         </div>`;
 
     if(listaEscrita) listaEscrita.innerHTML = html;
@@ -494,6 +495,7 @@ window.onload = () => {
     script.defer = true;
     document.head.appendChild(script);
 };
+
 
 
 
