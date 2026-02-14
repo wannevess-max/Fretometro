@@ -20,7 +20,7 @@ body, html { height: 100%; margin: 0; font-family: 'Segoe UI', Roboto, sans-seri
     position: absolute; top: 0; left: 0; height: 50px; background: var(--bg-sidebar);
     border-bottom: 1px solid var(--border-color); z-index: 100; 
     display: flex; align-items: center; padding: 0 20px; gap: 25px; 
-    width: 100%; transition: width 0.3s ease;
+    width: 100%;
 }
 
 .top-nav a { text-decoration: none; color: var(--text-main); font-weight: 600; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 5px; }
@@ -47,84 +47,68 @@ body, html { height: 100%; margin: 0; font-family: 'Segoe UI', Roboto, sans-seri
     padding: 40px; transition: right 0.5s cubic-bezier(0.16, 1, 0.3, 1);
     box-shadow: -10px 0 30px rgba(0,0,0,0.1); display: flex; flex-direction: column;
 }
-
 #painel-frota.active { right: 0; }
 
-/* NOVO PAINEL GOOGLE MAPS */
-#painel-google-maps {
-    position: absolute; right: -50%; top: 0; width: 50%; height: 100%; 
-    background: var(--bg-sidebar); z-index: 250; border-left: 1px solid var(--border-color);
-    transition: right 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-    box-shadow: -10px 0 30px rgba(0,0,0,0.1); display: flex; flex-direction: column;
-}
+/* ÁREA DA DIREITA DIVIDIDA */
+.map-container { flex-grow: 1; height: 100%; display: flex; flex-direction: column; position: relative; }
+#map { width: 100%; flex-grow: 1; }
 
-#painel-google-maps.active { right: 0; }
-
-#container-iframe-maps iframe {
+#painel-roteiro-escrito {
+    height: 0;
     width: 100%;
-    height: 100%;
-    border: none;
+    background: var(--bg-sidebar);
+    border-top: 1px solid var(--border-color);
+    overflow-y: auto;
+    transition: height 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    z-index: 150;
+}
+#painel-roteiro-escrito.active { height: 50%; }
+
+.header-roteiro {
+    position: sticky; top: 0; background: var(--bg-sidebar);
+    padding: 15px 20px; display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 1px solid var(--border-color); z-index: 10;
 }
 
-.map-container { flex-grow: 1; height: 100%; position: relative; }
-#map { width: 100%; height: 100%; }
+#lista-passo-a-passo { padding: 15px 25px; font-size: 13px; }
+.adp-substep { padding: 8px 0; border-bottom: 1px solid var(--border-color); display: flex; gap: 15px; align-items: flex-start; }
+.adp-distance { color: var(--text-sub); font-size: 0.85em; min-width: 70px; font-weight: bold; }
 
+/* Restante do CSS preservado */
 .header-sidebar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; }
 h2 { font-size: 1.1em; margin: 0; }
-
 #lista-pontos { list-style: none; padding: 0; margin: 0; }
 .ponto-item { background: var(--item-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 6px 10px; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
-
 .handle { color: var(--text-sub); cursor: grab; font-size: 16px; user-select: none; }
-
 .deslocamento-config { padding: 10px; background: var(--bg-body); border-radius: 6px; margin-bottom: 10px; display: none; flex-direction: column; gap: 5px; border: 1px solid var(--border-color); }
-
 input, select { width: 100%; padding: 7px 10px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 13px; background: var(--input-bg); color: var(--text-main); outline: none; }
-
 .grid-configs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
 .no-margin { margin-top: 0; }
-
 .container-barra { height: 8px; background: var(--border-color); border-radius: 10px; overflow: hidden; display: flex; width: 100%; margin-top: 10px; }
 .barra-vazio { background: #fb923c; height: 100%; transition: width 0.5s; width: 0%; }
 .barra-rota { background: #60a5fa; height: 100%; transition: width 0.5s; flex-grow: 1; }
-
 .perc-labels { display: flex; justify-content: space-between; font-size: 10px; font-weight: 700; margin-bottom: 10px; }
 .perc-labels .vazio { color: #fb923c; }
 .perc-labels .rota { color: #60a5fa; }
-
 .financeiro { background: var(--bg-sidebar); padding: 12px; border-radius: 8px; margin-top: 15px; border: 1px solid var(--border-color); }
 .financeiro .row { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 12px; color: var(--text-sub); }
-
 .total-row { color: var(--text-main) !important; font-weight: 600; border-top: 1px solid var(--border-color); padding-top: 4px; margin-top: 4px; }
 .km-real { color: #2563eb !important; font-weight: 700; margin-top: 2px; }
-
 .frete-destaque { font-size: 1.3em; font-weight: 700; color: var(--text-main); border-top: 1px solid var(--border-color); padding-top: 10px; margin-top: 10px; }
 .destaque-label { font-size: 10px; color: var(--text-sub); display: block; }
-
 .calc-btn { width: 100%; padding: 12px; background: var(--accent); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; margin-top: 10px; }
-
 .btn-add { width:100%; margin:8px 0; padding:8px; cursor:pointer; background:none; border:1px dashed var(--border-color); border-radius:4px; font-size:12px; color:var(--text-main); }
-
 .btn-remove { background: #fee2e2; color: #ef4444; border: none; border-radius: 4px; cursor: pointer; padding: 2px 6px; }
-
 .btn-gestao { width: 100%; padding: 10px; background: none; border: 1px solid var(--accent); color: var(--accent); border-radius: 6px; cursor: pointer; font-weight: 600; margin-top: 8px; }
-
 .btn-limpar { background:none; border:none; color:red; cursor:pointer; font-size:10px; }
-
 .secao-custo { margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px dashed var(--border-color); }
 .label-custo { font-size: 10px; font-weight: 700; color: var(--text-sub); display: block; margin-bottom: 4px; text-transform: uppercase; }
-
 .sub-label { font-size: 9px; color: var(--text-sub); margin-bottom: 2px; display: block; }
-
 .lista-frota-content { flex-grow: 1; overflow-y: auto; margin-top: 20px; }
 .veiculo-card { background: var(--bg-body); border: 1px solid var(--border-color); padding: 15px; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
-
 .f-checkbox { display: flex; align-items: center; gap: 8px; font-size: 12px; margin-top: 5px; }
 .f-checkbox input { width: auto; }
-
 .alerta-erro { background: #fee2e2; color: #b91c1c; padding: 10px; border-radius: 6px; font-size: 11px; font-weight: 600; margin-bottom: 10px; border: 1px solid #fecaca; display: none; }
-
-/* Estilos Adicionais do Painel de Custos */
 .operacional-box { background: #eff6ff; border-color: #bfdbfe; }
 .oper-title { color: #1e40af; font-weight: 700; }
 .custos-list { margin: 10px 0; border-bottom: 1px solid #bfdbfe; padding-bottom: 5px; }
