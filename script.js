@@ -31,14 +31,22 @@ function toggleGoogleMaps() {
 
 function toggleCustos() {
     const body = document.body;
+    const painelCustos = document.getElementById('painel-custos-extra');
+    
+    // Toggle da classe no body para o CSS reorganizar as colunas (25% cada)
     body.classList.toggle('custos-open');
     
-    // Recarrega lista de frota ao abrir
-    if (body.classList.contains('custos-open')) {
-        carregarSelectFrota();
+    // Mostra ou esconde o painel
+    if (painelCustos) {
+        if (body.classList.contains('custos-open')) {
+            painelCustos.style.display = 'block';
+            carregarSelectFrota();
+        } else {
+            painelCustos.style.display = 'none';
+        }
     }
 
-    // Força o redimensionamento do mapa para preencher o novo espaço (75% ou 50%)
+    // ESSENCIAL: Força o Google Maps a recalcular o tamanho baseado no novo espaço da div
     setTimeout(() => {
         if (typeof google !== 'undefined' && map) {
             google.maps.event.trigger(map, 'resize');
