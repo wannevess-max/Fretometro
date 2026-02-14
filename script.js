@@ -10,7 +10,7 @@ const darkStyle = [
     { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#17263c" }] }
 ];
 
-// --- FUNÇÕES DE INTERFACE ---
+// --- FUNÇÕES DE INTERFACE COM MEMÓRIA ---
 
 function toggleFrota() { 
     const painel = document.getElementById('painel-frota');
@@ -22,7 +22,8 @@ function toggleGoogleMaps() {
     const painel = document.getElementById('painel-roteiro-escrito');
     if(painel) {
         painel.classList.toggle('active');
-        localStorage.setItem('layout_roteiro', painel.classList.contains('active'));
+        // Salva o estado no navegador
+        localStorage.setItem('keep_roteiro', painel.classList.contains('active'));
     }
     
     setTimeout(() => { 
@@ -38,15 +39,13 @@ function toggleCustos() {
     
     body.classList.toggle('custos-open');
     const isOpen = body.classList.contains('custos-open');
-    localStorage.setItem('layout_custos', isOpen);
+    
+    // Salva o estado no navegador
+    localStorage.setItem('keep_custos', isOpen);
     
     if (painelCustos) {
-        if (isOpen) {
-            painelCustos.style.display = 'block';
-            carregarSelectFrota();
-        } else {
-            painelCustos.style.display = 'none';
-        }
+        painelCustos.style.display = isOpen ? 'block' : 'none';
+        if (isOpen) carregarSelectFrota();
     }
 
     setTimeout(() => {
@@ -56,19 +55,22 @@ function toggleCustos() {
     }, 300);
 }
 
-function restaurarLayout() {
-    const roteiroAberto = localStorage.getItem('layout_roteiro') === 'true';
-    const custosAberto = localStorage.getItem('layout_custos') === 'true';
+// Restaura a posição dos painéis ao carregar a página
+function restaurarPosicaoPaineis() {
+    const roteiroAberto = localStorage.getItem('keep_roteiro') === 'true';
+    const custosAberto = localStorage.getItem('keep_custos') === 'true';
 
     if (roteiroAberto) {
         document.getElementById('painel-roteiro-escrito')?.classList.add('active');
     }
-    
+
     if (custosAberto) {
         document.body.classList.add('custos-open');
         const p = document.getElementById('painel-custos-extra');
-        if (p) p.style.display = 'block';
-        carregarSelectFrota();
+        if (p) {
+            p.style.display = 'block';
+            carregarSelectFrota();
+        }
     }
 }
 
@@ -124,7 +126,9 @@ function initMap() {
 
     directionsRenderer.setMap(map);
     setupAutocomplete();
-    restaurarLayout();
+    
+    // Inicializa a restauração do layout salvo
+    restaurarPosicaoPaineis();
 }
 
 function setupAutocomplete() {
@@ -269,7 +273,6 @@ function atualizarFinanceiro() {
     const freteKmInput = parseMoeda(document.getElementById("valorPorKm").value);
     const impostoP = parseFloat(document.getElementById("imposto").value) || 1;
 
-    // Custos
     const custoCombustivel = consumoM > 0 ? (kmGeral / consumoM) * dieselL : 0;
     const custoArla = consumoM > 0 ? ((kmGeral / consumoM) * arlaP) * arlaL : 0;
     const custoManut = kmGeral * manutKm;
@@ -301,7 +304,6 @@ function atualizarFinanceiro() {
     document.getElementById("txt-frete-total").innerText = freteLiq.toLocaleString('pt-BR', opt);
     document.getElementById("txt-km-real").innerText = (kmTotal > 0 ? (freteLiq / kmTotal) : 0).toLocaleString('pt-BR', opt);
 
-    // Barra visual
     const pVazio = kmGeral > 0 ? (kmVazio / kmGeral) * 100 : 0;
     const pRota = kmGeral > 0 ? (kmTotal / kmGeral) * 100 : 100;
     document.getElementById("visual-vazio").style.width = pVazio + "%";
@@ -420,6 +422,3 @@ function formatarMoeda(input) {
 });
 
 document.getElementById('imposto').addEventListener('change', atualizarFinanceiro);
-
-// Inicialização imediata do layout
-restaurarLayout();
