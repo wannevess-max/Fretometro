@@ -285,73 +285,80 @@ function processarSegmentosRota(res) {
     
     let distTotalMetros = legs.reduce((acc, leg) => acc + leg.distance.value, 0);
 
-    // Cabeçalho estilizado conforme o seu objetivo
     let html = `
-        <div style="font-family: Arial, sans-serif; border: 1px solid #ccc; padding: 15px;">
-            <h3 style="margin-top:0;">Resumo do Percurso (Estilo AE)</h3>
-            <table class="tabela-roteiro" style="width:100%; border-collapse: collapse; font-size: 12px;">
-                <thead>
-                    <tr style="background: #f1f1f1; border-bottom: 2px solid #333;">
-                        <th style="width: 40px; padding: 10px; text-align: left;">Seq</th>
-                        <th style="width: 180px; padding: 10px; text-align: left;">Estrada / Cidade</th>
-                        <th style="width: 150px; padding: 10px; text-align: left;">Referência (Via)</th>
-                        <th style="padding: 10px; text-align: left;">Nome do Trecho</th>
-                        <th style="width: 90px; padding: 10px; text-align: right;">KM</th>
-                    </tr>
-                </thead>
-                <tbody>`;
+        <table class="tabela-roteiro" style="width:100%; border-collapse: collapse; font-family: Arial, sans-serif; font-size: 12px;">
+            <thead>
+                <tr style="background: #f1f1f1; border-bottom: 2px solid #333;">
+                    <th style="width: 40px; padding: 10px; text-align: left;">Seq</th>
+                    <th style="width: 180px; padding: 10px; text-align: left;">Estrada / Cidade</th>
+                    <th style="width: 150px; padding: 10px; text-align: left;">Referência (Via)</th>
+                    <th style="padding: 10px; text-align: left;">Nome do Trecho</th>
+                    <th style="width: 90px; padding: 10px; text-align: right;">KM</th>
+                </tr>
+            </thead>
+            <tbody>`;
 
     let globalSeq = 1;
+    let estadoAnterior = "";
 
     legs.forEach((leg) => {
-        // Filtramos os steps para pegar APENAS o que o Google mostra no resumo principal
-        // Isso remove os micro-passos de "vire à esquerda"
-        const stepsResumidos = leg.steps.filter(step => {
-            const instrucao = step.instructions.toLowerCase();
-            const km = step.distance.value / 1000;
-            // Critério: ser rodovia (BR/SP/BA/Rod) OU ter mais de 3km
-            return km > 3 || /rod\.|rodovia|br-|sp-|ba-|mg-|pb-/.test(instrucao);
+        // No .html que enviou, o Google destaca trechos que consolidam a rota.
+        // Filtramos para manter apenas Rodovias ou trechos longos (> 5km).
+        const passosPrincipais = leg.steps.filter(step => {
+            const txt = step.instructions.toLowerCase();
+            return step.distance.value > 5000 || /rod\.|rodovia|br-|sp-|ba-|mg-|pb-/.test(txt);
         });
 
-        stepsResumidos.forEach((step) => {
+        passosPrincipais.forEach((step) => {
             const instrucaoHTML = step.instructions;
-            const instrucaoLimpa = instrucaoHTML.replace(/<[^>]*>?/gm, '');
-
-            // 1. Extração da Via (Ex: BR-381, Rod. Dom Pedro I)
-            let via = "Acesso";
-            const viaMatch = instrucaoHTML.match(/\b([A-Z]{2}-\d{3})\b/);
-            if (viaMatch) {
-                via = viaMatch[1];
-            } else {
-                const bTags = instrucaoHTML.match(/<b>(.*?)<\/b>/g);
-                if (bTags) {
-                    const textoForte = bTags[0].replace(/<[^>]*>?/gm, '');
-                    if (textoForte.length > 3) via = textoForte;
-                }
-            }
-
-            // 2. Extração da Cidade/UF baseada na instrução do Google
-            // O arquivo .html mostra que o Google insere o nome da cidade no final da instrução "em [Cidade]"
-            let cidadeExibicao = "Rota";
-            const cidadeMatch = instrucaoHTML.match(/em\s<b>(.*?)\s-\s([A-Z]{2})<\/b>/) || 
+            
+            // 1. Extração da Cidade/UF conforme o padrão do arquivo .html
+            // O Google Maps insere "em [Cidade] - [UF]" nas instruções principais.
+            let localidade = "Rota";
+            let uf = "";
+            const matchLocal = instrucaoHTML.match(/em\s<b>(.*?)\s-\s([A-Z]{2})<\/b>/) || 
                                instrucaoHTML.match(/direção a\s<b>(.*?)\s-\s([A-Z]{2})<\/b>/);
             
-            if (cidadeMatch) {
-                cidadeExibicao = `${cidadeMatch[1]} / ${cidadeMatch[2]}`;
+            if (matchLocal) {
+                localidade = `${matchLocal[1]} / ${matchLocal[2]}`;
+                uf = matchLocal[2];
             } else {
-                // Fallback: pega a cidade do endereço do trecho caso não ache no texto
-                const partesEndereco = leg.start_address.split(',');
-                if (partesEndereco.length >= 2) {
-                    cidadeExibicao = partesEndereco[partesEndereco.length - 2].trim().replace('-', '/');
+                // Fallback para o endereço do trecho (leg)
+                const partes = leg.start_address.split(',');
+                if (partes.length >= 2) {
+                    const textoUf = partes[partes.length - 2].trim();
+                    localidade = textoUf.replace('-', '/');
+                    uf = (textoUf.match(/[A-Z]{2}$/) || [""])[0];
                 }
             }
+
+            // 2. Referência da Via (BR, SP, Rodovias)
+            let via = "Acesso";
+            const viaSigla = instrucaoHTML.match(/\b([A-Z]{2}-\d{3})\b/);
+            if (viaSigla) {
+                via = viaSigla[1];
+            } else {
+                const bTags = instrucaoHTML.match(/<b>(.*?)<\/b>/g);
+                if (bTags) via = bTags[0].replace(/<[^>]*>?/gm, '');
+            }
+
+            // 3. Linha de Divisa de Estado (Baseado na mudança de UF detectada no HTML)
+            if (uf && estadoAnterior && uf !== estadoAnterior) {
+                html += `
+                    <tr style="background: #eee; font-weight: bold;">
+                        <td style="padding: 5px;">${uf}</td>
+                        <td colspan="3" style="padding: 5px; text-align: center;">---------------- DIVISA DE ESTADO ----------------</td>
+                        <td style="padding: 5px; text-align: right;">----------</td>
+                    </tr>`;
+            }
+            estadoAnterior = uf || estadoAnterior;
 
             html += `
                 <tr style="border-bottom: 1px solid #eee;">
                     <td style="padding: 8px;">${globalSeq++}</td>
-                    <td style="padding: 8px;">${cidadeExibicao}</td>
+                    <td style="padding: 8px;">${localidade}</td>
                     <td style="padding: 8px; font-weight: bold; color: #1a56db;">${via}</td>
-                    <td style="padding: 8px; color: #444;">${instrucaoLimpa}</td>
+                    <td style="padding: 8px;">${instrucaoHTML.replace(/<[^>]*>?/gm, '')}</td>
                     <td style="padding: 8px; text-align: right; font-weight: bold;">${step.distance.text}</td>
                 </tr>`;
         });
@@ -361,10 +368,10 @@ function processarSegmentosRota(res) {
     
     const kmTotal = (distTotalMetros / 1000).toFixed(1).replace('.', ',');
     html += `
-        <div style="margin-top: 15px; padding: 10px; border: 2px solid #000; font-weight: bold;">
-            RELATÓRIO DE VIAGEM OPERACIONAL | DISTÂNCIA TOTAL: ${kmTotal} km
-        </div>
-    </div>`;
+        <div style="margin-top: 15px; padding: 10px; border: 2px solid #000; font-weight: bold; display: flex; justify-content: space-between;">
+            <span>RELATÓRIO DE VIAGEM OPERACIONAL</span>
+            <span>TOTAL: ${kmTotal} km</span>
+        </div>`;
 
     if (listaEscrita) listaEscrita.innerHTML = html;
     if (typeof atualizarFinanceiro === "function") atualizarFinanceiro();
@@ -474,6 +481,7 @@ window.onload = () => {
     script.defer = true;
     document.head.appendChild(script);
 };
+
 
 
 
