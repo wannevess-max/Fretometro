@@ -14,19 +14,21 @@ const darkStyle = [
 
 function toggleFrota() { 
     const painel = document.getElementById('painel-frota');
-    painel.classList.toggle('active');
+    if(painel) painel.classList.toggle('active');
     renderFrota();
 }
 
 function toggleGoogleMaps() {
     const painel = document.getElementById('painel-roteiro-escrito');
-    painel.classList.toggle('active');
+    if(painel) painel.classList.toggle('active');
     
     setTimeout(() => { 
-        google.maps.event.trigger(map, "resize"); 
-        if (directionsRenderer.getDirections()) {
-            const res = directionsRenderer.getDirections();
-            map.fitBounds(res.routes[0].bounds);
+        if(typeof google !== 'undefined') {
+            google.maps.event.trigger(map, "resize"); 
+            if (directionsRenderer.getDirections()) {
+                const res = directionsRenderer.getDirections();
+                map.fitBounds(res.routes[0].bounds);
+            }
         }
     }, 400);
 }
@@ -115,15 +117,17 @@ function vincularFrota(sel) {
         return;
     }
     const v = frota[sel.value];
-    document.getElementById('consumoDieselMedia').value = v.consumo;
-    document.getElementById('custoManutencaoKm').value = v.manut;
-    document.getElementById('arlaPorcentagem').value = v.arla;
-    document.getElementById('consumoFrioHora').value = v.consumoFrio || "";
-    
-    inputsCustos.forEach(id => { 
-        const el = document.getElementById(id); 
-        if(el) { el.readOnly = true; el.style.opacity = "0.8"; } 
-    });
+    if(v) {
+        document.getElementById('consumoDieselMedia').value = v.consumo;
+        document.getElementById('custoManutencaoKm').value = v.manut;
+        document.getElementById('arlaPorcentagem').value = v.arla;
+        document.getElementById('consumoFrioHora').value = v.consumoFrio || "";
+        
+        inputsCustos.forEach(id => { 
+            const el = document.getElementById(id); 
+            if(el) { el.readOnly = true; el.style.opacity = "0.8"; } 
+        });
+    }
     atualizarFinanceiro();
 }
 
@@ -138,6 +142,7 @@ function toggleAparelhoFrio() {
 
 function toggleCustos() {
     const painel = document.getElementById('painel-custos-extra');
+    if(!painel) return;
     const isHidden = window.getComputedStyle(painel).display === 'none';
     const novoEstado = isHidden ? 'block' : 'none';
     painel.style.display = novoEstado;
@@ -173,12 +178,16 @@ function initApp() {
     directionsRenderer = new google.maps.DirectionsRenderer({ draggable: true, map: map });
     directionsService = new google.maps.DirectionsService();
     
-    Sortable.create(document.getElementById('lista-pontos'), { 
-        animation: 150, handle: '.handle', draggable: '.sortable-item', 
-        onEnd: () => { if(rotaIniciada) calcularRota(); } 
-    });
+    if(typeof Sortable !== 'undefined') {
+        Sortable.create(document.getElementById('lista-pontos'), { 
+            animation: 150, handle: '.handle', draggable: '.sortable-item', 
+            onEnd: () => { if(rotaIniciada) calcularRota(); } 
+        });
+    }
 
-    setupAutocomplete("saida"); setupAutocomplete("origem"); setupAutocomplete("destino");
+    setupAutocomplete("saida"); 
+    setupAutocomplete("origem"); 
+    setupAutocomplete("destino");
 
     document.getElementById("themeBtn").onclick = function() {
         document.body.classList.toggle("dark-mode");
@@ -207,12 +216,16 @@ function initApp() {
     document.getElementById("btnCalcular").onclick = calcularRota;
     
     directionsRenderer.addListener('directions_changed', () => { 
-        const res = directionsRenderer.getDirections(); if (res) processarSegmentosRota(res); 
+        const res = directionsRenderer.getDirections(); 
+        if (res) processarSegmentosRota(res); 
     });
 
     updateSelects();
     const estadoSalvo = localStorage.getItem('painelCustosEstado');
-    if (estadoSalvo) document.getElementById('painel-custos-extra').style.display = estadoSalvo;
+    if (estadoSalvo) {
+        const pc = document.getElementById('painel-custos-extra');
+        if(pc) pc.style.display = estadoSalvo;
+    }
 }
 
 function setupAutocomplete(id) {
@@ -260,8 +273,6 @@ function calcularRota() {
         } 
     });
 }
-
-// --- LOGICA DE TABELA DE 5 COLUNAS CORRIGIDA ---
 
 function processarSegmentosRota(res) {
     const legs = res.routes[0].legs;
@@ -356,11 +367,9 @@ function processarSegmentosRota(res) {
             <span style="font-size: 18px; color: #1e293b;">DISTÂNCIA TOTAL: <strong>${totalKm.replace('.', ',')} km</strong></span>
         </div>`;
 
-    listaEscrita.innerHTML = html;
-    if (typeof atualizarFinanceiro === "function") atualizarFinanceiro();
+    if(listaEscrita) listaEscrita.innerHTML = html;
+    atualizarFinanceiro();
 }
-
-// --- CÁLCULOS FINANCEIROS ---
 
 function atualizarFinanceiro() {
     const kmVazio = distVazioMetros / 1000; 
@@ -407,15 +416,19 @@ function atualizarFinanceiro() {
     const custoManutTotal = kmTotal * manutKm;
 
     let custoFrioTotal = 0;
-    if (document.getElementById("tipoCarga").value === "frigorifica") {
+    const tipoCargaEl = document.getElementById("tipoCarga");
+    if (tipoCargaEl && tipoCargaEl.value === "frigorifica") {
         const consFrio = parseFloat(document.getElementById("consumoFrioHora").value) || 0;
         const pColetaStr = document.getElementById("prevColeta").value;
         const pEntregaStr = document.getElementById("prevEntrega").value;
         if (pColetaStr && pEntregaStr) {
             const horas = Math.abs(new Date(pEntregaStr) - new Date(pColetaStr)) / 36e5;
             custoFrioTotal = horas * consFrio * precoDiesel;
-            document.getElementById("row-an-frio").style.display = "flex";
-            document.getElementById("txt-an-frio").innerText = "R$ " + custoFrioTotal.toLocaleString('pt-BR', opt);
+            const rowFrio = document.getElementById("row-an-frio");
+            if(rowFrio) {
+                rowFrio.style.display = "flex";
+                document.getElementById("txt-an-frio").innerText = "R$ " + custoFrioTotal.toLocaleString('pt-BR', opt);
+            }
         }
     } else if(document.getElementById("row-an-frio")) {
         document.getElementById("row-an-frio").style.display = "none";
@@ -449,14 +462,16 @@ function limparPainelCustos() {
     ["custoDieselLitro", "consumoDieselMedia", "custoArlaLitro", "arlaPorcentagem", "custoPedagio", "custoManutencaoKm", "consumoFrioHora", "prevColeta", "prevEntrega"].forEach(id => {
         const el = document.getElementById(id); if(el) el.value = "";
     });
-    document.getElementById("selFrotaVinculo").value = "";
-    document.getElementById("tipoCarga").value = "seca";
+    const selFrota = document.getElementById("selFrotaVinculo");
+    if(selFrota) selFrota.value = "";
+    const tipoCarga = document.getElementById("tipoCarga");
+    if(tipoCarga) tipoCarga.value = "seca";
     toggleAparelhoFrio();
 }
 
 window.onload = () => {
     const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?key=SUA_CHAVE&libraries=places&callback=initApp`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyClbY5ZvkjrMGP4nJmZzCcm4hUu5-fjZV0&libraries=places&callback=initApp`;
     script.async = true;
     document.head.appendChild(script);
 };
