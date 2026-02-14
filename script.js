@@ -262,7 +262,7 @@ function calcularRota() {
 
 // --- LOGICA DE TABELA DE 5 COLUNAS CORRIGIDA ---
 
-{
+function processarSegmentosRota(res) {
     const legs = res.routes[0].legs;
     const listaEscrita = document.getElementById("lista-passo-a-passo");
     const temSaida = document.getElementById("saida").value;
@@ -295,11 +295,14 @@ function calcularRota() {
     legs.forEach((leg, legIndex) => {
         const isVazio = (temSaida && legIndex === 0);
         
-        // --- LÓGICA DE EXTRAÇÃO DE CIDADE ---
+        // --- LÓGICA DE EXTRAÇÃO DE CIDADE MELHORADA ---
+        // O start_address do Google costuma ser: "Rua, Bairro, Cidade - UF, CEP, País"
         const partesEnd = leg.start_address.split(',');
         let cidadeUF = "Rota";
         let ufAtual = "";
+
         if (partesEnd.length >= 3) {
+            // Pegamos o trecho que normalmente contém "Cidade - UF"
             const trechoLocal = partesEnd[partesEnd.length - 3].trim();
             cidadeUF = trechoLocal;
             const ufMatch = trechoLocal.match(/\b([A-Z]{2})\b/);
@@ -321,19 +324,23 @@ function calcularRota() {
             }
             estadoAnterior = ufAtual;
 
-            // --- LÓGICA DE LIMPEZA DA COLUNA REFERÊNCIA ---
+            // --- LÓGICA DE LIMPEZA DA COLUNA REFERÊNCIA (ANTI-POLUIÇÃO) ---
             let viaRef = "Urbano";
             const viaSigla = instrucaoHTML.match(/\b([A-Z]{2}-\d{3,4})\b/); 
-            const textoNegrito = instrucaoHTML.match(/<b>(.*?)<\/b>/);
+            const textoNegrito = instrucaoHTML.match(/<b>(.*?)<\/b>/g); // Pega todos os negritos
 
             if (viaSigla) {
-                viaRef = viaSigla[1]; // Ex: BR-116, SP-330
+                viaRef = viaSigla[1]; 
             } else if (textoNegrito) {
-                const bText = textoNegrito[1].replace(/<[^>]*>?/gm, '');
-                // Filtro anti-poluição: não aceita comandos de direção como referência
-                const comandosProibidos = /Vire|Mantenha|Siga|Curva|Saída|Esquerda|Direita|Direção|ª/i;
-                if (!comandosProibidos.test(bText)) {
-                    viaRef = bText;
+                // Filtramos os termos em negrito para achar o nome da via, ignorando comandos
+                const comandosProibidos = /Vire|Mantenha|Siga|Curva|Saída|Esquerda|Direita|Direção|ª|Acesso/i;
+                
+                for (let n of textoNegrito) {
+                    let bText = n.replace(/<[^>]*>?/gm, '');
+                    if (!comandosProibidos.test(bText) && bText.length > 2) {
+                        viaRef = bText;
+                        break; // Pega o primeiro negrito que pareça um nome de rua/estrada
+                    }
                 }
             }
 
@@ -472,6 +479,7 @@ window.onload = () => {
     script.async = true;
     document.head.appendChild(script);
 };
+
 
 
 
