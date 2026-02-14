@@ -29,11 +29,6 @@ function toggleGoogleMaps() {
     }, 300);
 }
 
-/**
- * IMPLEMENTAÇÃO SOLICITADA:
- * Gerencia a visibilidade do painel de custos ocupando 25% da tela.
- * Adiciona a classe 'custos-visible' ao body para que o CSS possa redimensionar o layout.
- */
 function toggleCustos() {
     const body = document.body;
     const painelExtra = document.getElementById('painel-custos-extra');
@@ -41,21 +36,17 @@ function toggleCustos() {
     
     if (!painelExtra) return;
 
-    // Toggle da classe de controle de layout no Body
     body.classList.toggle('custos-open');
 
     if (body.classList.contains('custos-open')) {
-        // MOSTRAR PAINEL
         painelExtra.style.display = 'block';
         if (sidebarPadrao) sidebarPadrao.style.display = 'none';
         carregarSelectFrota();
     } else {
-        // ESCONDER PAINEL
         painelExtra.style.display = 'none';
         if (sidebarPadrao) sidebarPadrao.style.display = 'block';
     }
 
-    // Redimensiona o mapa para ajustar ao novo espaço de 75%
     setTimeout(() => {
         if (typeof google !== 'undefined' && map) {
             google.maps.event.trigger(map, 'resize');
@@ -95,9 +86,7 @@ function toggleAparelhoFrio() {
 // --- LÓGICA DO MAPA ---
 
 function initMap() {
-    if (typeof google === 'undefined' || typeof google.maps === 'undefined') {
-        return; 
-    }
+    if (typeof google === 'undefined' || typeof google.maps === 'undefined') return;
 
     directionsService = new google.maps.DirectionsService();
     directionsRenderer = new google.maps.DirectionsRenderer({
@@ -235,18 +224,23 @@ function processarSegmentosRota(res) {
 
 // --- LÓGICA FINANCEIRA ---
 
+function parseMoeda(valor) {
+    if(!valor) return 0;
+    return parseFloat(valor.toString().replace("R$ ","").replace(/\./g, "").replace(",",".")) || 0;
+}
+
 function atualizarFinanceiro() {
     const kmTotal = (distRotaMetros / 1000);
     const kmVazio = (distVazioMetros / 1000);
     const kmGeral = kmTotal + kmVazio;
 
-    const dieselL = parseFloat(document.getElementById("custoDieselLitro").value.replace("R$ ","").replace(",",".")) || 0;
+    const dieselL = parseMoeda(document.getElementById("custoDieselLitro").value);
     const consumoM = parseFloat(document.getElementById("consumoDieselMedia").value) || 0;
-    const arlaL = parseFloat(document.getElementById("custoArlaLitro").value.replace("R$ ","").replace(",",".")) || 0;
+    const arlaL = parseMoeda(document.getElementById("custoArlaLitro").value);
     const arlaP = (parseFloat(document.getElementById("arlaPorcentagem").value) || 0) / 100;
-    const pedagio = parseFloat(document.getElementById("custoPedagio").value.replace("R$ ","").replace(",",".")) || 0;
-    const manutKm = parseFloat(document.getElementById("custoManutencaoKm").value.replace("R$ ","").replace(",",".")) || 0;
-    const freteBase = parseFloat(document.getElementById("valorPorKm").value.replace("R$ ","").replace(",",".")) || 0;
+    const pedagio = parseMoeda(document.getElementById("custoPedagio").value);
+    const manutKm = parseMoeda(document.getElementById("custoManutencaoKm").value);
+    const freteKmInput = parseMoeda(document.getElementById("valorPorKm").value);
     const impostoP = parseFloat(document.getElementById("imposto").value) || 1;
 
     const custoCombustivel = consumoM > 0 ? (kmGeral / consumoM) * dieselL : 0;
@@ -256,11 +250,11 @@ function atualizarFinanceiro() {
     let custoFrio = 0;
     if(document.getElementById("tipoCarga").value === "frigorifica") {
         const consH = parseFloat(document.getElementById("consumoFrioHora").value) || 0;
-        custoFrio = consH * dieselL * 5; // Exemplo de 5 horas de uso
+        custoFrio = consH * dieselL * 5; 
     }
 
     const totalCustos = custoCombustivel + custoArla + custoManut + pedagio + custoFrio;
-    const freteLiq = (freteBase * kmTotal) * impostoP;
+    const freteLiq = (freteKmInput * kmTotal) * impostoP;
     const lucro = freteLiq - totalCustos;
 
     const opt = { style: 'currency', currency: 'BRL' };
@@ -274,7 +268,10 @@ function atualizarFinanceiro() {
         "txt-an-manut": custoManut.toLocaleString('pt-BR', opt),
         "txt-an-frio": custoFrio.toLocaleString('pt-BR', opt),
         "txt-total-custos": totalCustos.toLocaleString('pt-BR', opt),
-        "txt-lucro-real": lucro.toLocaleString('pt-BR', opt)
+        "txt-lucro-real": lucro.toLocaleString('pt-BR', opt),
+        "txt-frete-base": (freteKmInput * kmTotal).toLocaleString('pt-BR', opt),
+        "txt-frete-total": freteLiq.toLocaleString('pt-BR', opt),
+        "txt-km-real": (kmTotal > 0 ? (freteLiq / kmTotal) : 0).toLocaleString('pt-BR', opt)
     };
 
     for (let id in ids) {
@@ -355,7 +352,7 @@ function renderFrota() {
         div.innerHTML = `
             <div><strong>${v.nome}</strong></div>
             <button onclick="selecionarVeiculo(${v.id})" style="padding:5px 10px; font-size:10px;">Selecionar</button>
-            <button onclick="excluirVeiculo(${v.id})" style="padding:5px 10px; font-size:10px; background:red;">×</button>
+            <button onclick="excluirVeiculo(${v.id})" style="padding:5px 10px; font-size:10px; background:red; color:white; border:none; border-radius:4px;">×</button>
         `;
         list.appendChild(div);
     });
@@ -392,5 +389,4 @@ function formatarMoeda(input) {
     input.value = "R$ " + valor;
 }
 
-// Inicialização
 window.initMap = initMap;
