@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logística Pro - Visão Financeira Completa</title>
+    
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    
+    <link rel="stylesheet" href="style.css?v=1.0.2">
+    <style>
+        /* Ajustes específicos para o novo layout de colunas */
+        .wrapper {
+            display: flex;
+            height: 100vh;
+            flex-direction: row;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: 25%;
+            min-width: 320px;
+            height: 100%;
+            overflow-y: auto;
+            border-right: 1px solid var(--border-color);
+            z-index: 10;
+        }
+
+        #painel-custos-extra {
+            display: none;
+            width: 25%;
+            min-width: 320px;
+            height: 100%;
+            overflow-y: auto;
+            background: var(--bg-sidebar);
+            border-right: 1px solid var(--border-color);
+            padding: 20px;
+        }
+
+        .map-container {
+            flex-grow: 1;
+            position: relative;
+            height: 100%;
+        }
+
+        .custos-open #painel-custos-extra {
+            display: block;
+        }
+
+        @media print {
+            .sidebar, #painel-custos-extra, .top-nav { display: none; }
+            .map-container { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="wrapper" id="mainWrapper">
+    <div class="top-nav" id="topNav">
+        <a onclick="toggleFrota()"> Minha Frota</a>
+        <a onclick="toggleGoogleMaps()">🗺️ Roteiro Resumido</a>
+        <a onclick="document.getElementById('themeBtn').click()">🌙 Modo</a>
+        <a onclick="window.print()">🖨️ Imprimir Relatório</a>
+    </div>
+
+    <div id="painel-frota">
+        <div style="display:flex; justify-content: space-between; align-items: center;">
+            <h2 id="frota-titulo">Minha Frota</h2>
+            <span style="cursor:pointer; font-size:24px;" onclick="toggleFrota()">&times;</span>
+        </div>
+        <div style="margin-top:20px;">
+            <input type="hidden" id="f-edit-index" value="-1">
+            <label class="label-custo">Apelido Frota / Modelo Veiculo</label>
+            <input type="text" id="f-nome" placeholder="Ex: Carreta Frigorifica">
+            
+            <div class="grid-configs">
+                <div>
+                    <label class="label-custo">Número de Eixos</label>
+                    <select id="f-eixos">
+                        <option value="2">2 Eixos (Toco/VUC)</option>
+                        <option value="3">3 Eixos (Truck/Pesado)</option>
+                        <option value="4">4 Eixos (Articulados)</option>
+                        <option value="5">5 Eixos (Carreta Simples)</option>
+                        <option value="6">6 Eixos (Carreta LS)</option>
+                        <option value="7">7 Eixos (Bitrem)</option>
+                        <option value="9">9 Eixos (Rodotrem)</option>
+                        <option value="11">11 Eixos (Super-Rodotrem)</option>
+                    </select>
+                </div>
+                <div><label class="label-custo">Consumo Médio (Km/L)</label><input type="number" id="f-consumo" step="0.1" placeholder="Ex: 2.5"></div>
+            </div>
+
+            <div class="grid-configs">
+                <div><label class="label-custo">Manutenção (R$/Km)</label><input type="text" id="f-manut" placeholder="R$ 0,00" oninput="formatarMoeda(this)"></div>
+                <div><label class="label-custo">Arla 32 (% do diesel)</label><input type="number" id="f-arla" placeholder="Ex: 5" step="0.1"></div>
+            </div>
+
+            <div class="f-checkbox">
+                <input type="checkbox" id="f-tem-frio" onchange="document.getElementById('f-box-frio').style.display = this.checked ? 'block' : 'none'">
+                <label for="f-tem-frio">Possui aparelho frio</label>
+            </div>
+
+            <div id="f-box-frio" style="display:none; margin-top: 10px;">
+                <label class="label-custo">Consumo Aparelho Frio (L/Hora)</label>
+                <input type="number" id="f-consumo-frio" placeholder="Ex: 2.0" step="0.1">
+            </div>
+
+            <button class="calc-btn" onclick="salvarVeiculo()">Salvar Veículo</button>
+        </div>
+        <div class="lista-frota-content" id="lista-v-render"></div>
+    </div>
+
+    <div class="sidebar">
+        <div class="header-sidebar">
+            <h2>Roteirizador</h2>
+            <button style="background:none; border:none; color:red; cursor:pointer; font-size:10px;" onclick="window.location.reload()">Novo Frete</button>
+            <button class="theme-toggle" id="themeBtn" style="display:none;">🌙</button>
+        </div>
+
+        <ul id="lista-pontos">
+            <li class="ponto-item item-saida" id="li-saida">
+                <span class="handle" style="cursor:default">📍</span>
+                <input id="saida" type="text" placeholder="Saída Deslocamento Vazio (Opcional)" autocomplete="off">
+            </li>
+            <div id="container-config-deslocamento" class="deslocamento-config">
+                <label style="font-size:10px; font-weight:700; color:var(--text-sub); margin-bottom:2px;">DESLOCAMENTO REMUNERADO</label>
+                <select id="tipoDeslocamento">
+                    <option value="nao_remunerado">Não Remunerado</option>
+                    <option value="remunerado_km">Remunerado R$ por KM vazio</option>
+                    <option value="remunerado_rs">Remunerado R$ Fechado Deslocamento</option>
+                </select>
+                <input id="valorDeslocamentoKm" type="text" placeholder="R$ 0,00 por KM" style="display:none;">
+                <input id="valorDeslocamentoTotal" type="text" placeholder="R$ 0,00 Total" style="display:none;">
+            </div>
+            <li class="ponto-item sortable-item" id="li-origem">
+                <span class="handle">☰</span>
+                <input id="origem" type="text" placeholder="Origem" autocomplete="off">
+            </li>
+            <li class="ponto-item sortable-item" id="li-destino">
+                <span class="handle">☰</span>
+                <input id="destino" type="text" placeholder="Destino" autocomplete="off">
+            </li>
+        </ul>
+
+        <button class="btn-add" id="btnAddParada" onclick="adicionarParada()">+ Adicionar Parada</button>
+
+        <div class="grid-configs">
+            <div>
+                <label class="label-custo">VALOR POR KM</label>
+                <input id="valorPorKm" type="text" value="R$ 0,00" oninput="formatarMoeda(this)">
+            </div>
+            <div>
+                <label class="label-custo">ALÍQUOTA IMPOSTO</label>
+                <select id="imposto">
+                      <option value="1">Isento (0%)</option>
+                      <option value="0.93">7%</option>
+                      <option value="0.88">12%</option>
+                      <option value="0.83">17%</option>
+                      <option value="0.825">17,5%</option>
+                      <option value="0.82">18%</option>
+                      <option value="0.81">19%</option>
+                      <option value="0.80">20%</option>
+                      <option value="0.795">20,5%</option>
+                      <option value="0.79">21%</option>
+                      <option value="0.78">22%</option>
+                      <option value="0.77">23%</option>
+                </select>
+            </div>
+        </div>
+
+        <button class="btn-gestao" onclick="toggleCustos()" style="margin-top: 15px;">Painel de Custos (Extra)</button>
+
+        <div class="financeiro">
+            <div class="row">KM Deslocado (Vazio) <span><b id="txt-km-vazio-det">0,0 km</b></span></div>
+            <div class="row">KM Frete (Carregado) <span><b id="txt-km-rota-det">0,0 km</b></span></div>
+            <div class="row total-row">KM Total <b id="txt-km-total">0,0 km</b></div>
+            <div class="row km-real">R$/Km Real <b id="txt-km-real">R$ 0,00</b></div>
+
+            <div class="container-barra">
+                <div id="visual-vazio" class="barra-vazio"></div>
+                <div id="visual-rota" class="barra-rota"></div>
+            </div>
+            <div class="perc-labels">
+                <span class="vazio">Vazio: <span id="perc-vazio">0%</span></span>
+                <span class="rota">Rota: <span id="perc-rota">100%</span></span>
+            </div>
+
+            <div class="row">Frete Base <span><b id="txt-frete-base">R$ 0,00</b></span></div>
+            <div class="row">Deslocamento <span><b id="txt-valor-deslocamento-fin">R$ 0,00</b></span></div>
+            <div class="row">Imposto <span><b id="txt-valor-imp">R$ 0,00</b></span></div>
+            <div class="frete-destaque">
+                <span class="destaque-label">TOTAL LÍQUIDO</span>
+                <span id="txt-frete-total">R$ 0,00</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="painel-custos-extra">
+        <div class="header-sidebar">
+            <h2>Custos Adicionais</h2>
+            <button class="btn-limpar" onclick="limparPainelCustos()">Limpar</button>
+        </div>
+        
+        <div class="secao-custo">
+            <label class="label-custo">Veículo da Frota</label>
+            <select id="selFrotaVinculo" onchange="vincularFrota(this)"></select>
+        </div>
+
+        <div class="secao-custo">
+            <label class="label-custo">Diesel</label>
+            <div class="grid-configs no-margin">
+                <div><span class="sub-label">PREÇO/L</span><input type="text" id="custoDieselLitro" placeholder="R$ 0,00" oninput="formatarMoeda(this)"></div>
+                <div><span class="sub-label">MÉDIA KM/L</span><input type="number" id="consumoDieselMedia" placeholder="Ex: 2.5" step="0.1"></div>
+            </div>
+        </div>
+
+        <div class="secao-custo">
+            <label class="label-custo">Arla 32</label>
+            <div class="grid-configs no-margin">
+                <div><span class="sub-label">PREÇO/L</span><input type="text" id="custoArlaLitro" placeholder="R$ 0,00" oninput="formatarMoeda(this)"></div>
+                <div><span class="sub-label">% DO DIESEL</span><input type="number" id="arlaPorcentagem" placeholder="Ex: 5" step="0.1"></div>
+            </div>
+        </div>
+
+        <div class="secao-custo">
+            <div class="grid-configs no-margin">
+                <div>
+                    <label class="label-custo">Pedágios</label>
+                    <input type="text" id="custoPedagio" placeholder="Valor Total R$" oninput="formatarMoeda(this)">
+                </div>
+                <div>
+                    <label class="label-custo">Manutenção (por KM)</label>
+                    <input type="text" id="custoManutencaoKm" placeholder="R$ 0,00 por KM" oninput="formatarMoeda(this)">
+                </div>
+            </div>
+        </div>
+
+        <div class="secao-custo">
+            <div class="grid-configs no-margin split-carga">
+                <div>
+                    <label class="label-custo">Tipo de Carga</label>
+                    <select id="tipoCarga" onchange="toggleAparelhoFrio()">
+                        <option value="seca">Carga Seca</option>
+                        <option value="frigorifica">Carga Frigorífica</option>
+                        <option value="granel">Carga a Granel</option>
+                        <option value="sider">Carga Sider</option>
+                        <option value="outros">Outros</option>
+                    </select>
+                </div>
+                <div id="container-frio-input" style="display:none;">
+                    <label class="label-custo">Consumo Frio L/H</label>
+                    <input type="number" id="consumoFrioHora" placeholder="Ex: 2.5" step="0.1">
+                </div>
+            </div>
+        </div>
+
+        <div id="container-frio-datas" style="display:none;">
+            <div id="alerta-datas-frio" class="alerta-erro">⚠️ Informar Coleta e Entrega para Cálculo do Aparelho Frio</div>
+            <div id="alerta-erro-datas" class="alerta-erro">⚠️ Previsão Entrega não pode ser anterior a Previsão Coleta</div>
+            
+            <div class="secao-custo">
+                <div class="grid-configs">
+                    <div>
+                        <label class="label-custo">Previsão Coleta</label>
+                        <input type="datetime-local" id="prevColeta">
+                    </div>
+                    <div>
+                        <label class="label-custo">Previsão Entrega</label>
+                        <input type="datetime-local" id="prevEntrega">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="financeiro operacional-box">
+            <div class="row oper-title">RESULTADO OPERACIONAL</div>
+            
+            <div id="analise-custos-detalhada" class="custos-list">
+                <div class="row">Custo Diesel <span id="txt-an-diesel">R$ 0,00</span></div>
+                <div class="row">Custo Arla <span id="txt-an-arla">R$ 0,00</span></div>
+                <div class="row">Custo Pedágio <span id="txt-an-pedagio">R$ 0,00</span></div>
+                <div class="row">Custo Manut. <span id="txt-an-manut">R$ 0,00</span></div>
+                <div class="row" id="row-an-frio" style="display:none;">Custo Ap. Frio <span id="txt-an-frio">R$ 0,00</span></div>
+            </div>
+
+            <div class="row bold-row">Frete <span id="txt-an-frete-liquido">R$ 0,00</span></div>
+            <div class="row bold-row">Imposto <span id="txt-an-imposto">R$ 0,00</span></div>
+            <div class="row bold-row">Total Custos <span id="txt-total-custos">R$ 0,00</span></div>
+            
+            <div class="frete-destaque lucro-destaque" id="destaque-lucro">
+                <span class="destaque-label">LUCRO ESTIMADO</span>
+                <span id="txt-lucro-real">R$ 0,00</span>
+            </div>
+        </div>
+        <button class="calc-btn" onclick="toggleCustos()">Fechar Custos</button>
+    </div>
+
+    <div class="map-container">
+        <div id="map" style="height: 100%; width: 100%;"></div>
+        <div id="painel-roteiro-escrito">
+            <div class="header-roteiro">
+                <h2>Resumo do Percurso (Estilo AE)</h2>
+                <span style="cursor:pointer; font-size:24px;" onclick="toggleGoogleMaps()">&times;</span>
+            </div>
+            <div id="lista-passo-a-passo">
+                <p style="padding: 20px; color: var(--text-sub);">Calcule uma rota para visualizar o roteiro resumido.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyClbY5ZvkjrMGP4nJmZzCcm4hUu5-fjZV0&libraries=places&callback=initMap" async defer></script>
+<script src="script.js?v=1.0.2"></script>
+</body>
+</html>
