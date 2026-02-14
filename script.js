@@ -2,14 +2,6 @@ let map, directionsRenderer, directionsService, paradasData = {}, rotaIniciada =
 let distVazioMetros = 0, distRotaMetros = 0;
 let frota = JSON.parse(localStorage.getItem('frota_db')) || [];
 
-const darkStyle = [
-    { "elementType": "geometry", "stylers": [{ "color": "#242f3e" }] }, 
-    { "elementType": "labels.text.fill", "stylers": [{ "color": "#746855" }] }, 
-    { "elementType": "labels.text.stroke", "stylers": [{ "color": "#242f3e" }] }, 
-    { "featureType": "road", "elementType": "geometry", "stylers": [{ "color": "#38414e" }] }, 
-    { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#17263c" }] }
-];
-
 // --- FUNÇÕES DE INTERFACE ---
 
 function toggleFrota() { 
@@ -77,7 +69,7 @@ function calcularRota() {
     const pontoVazio = document.getElementById("pontoVazio").value;
 
     if(!origem || !destino) {
-        alert("Informe pelo menos Origem e Destino.");
+        alert("Informe origem e destino.");
         return;
     }
 
@@ -114,6 +106,8 @@ function executarRotaPrincipal(origem, destino) {
             directionsRenderer.setDirections(res);
             distRotaMetros = res.routes[0].legs.reduce((acc, leg) => acc + leg.distance.value, 0);
             rotaIniciada = true;
+            
+            // CHAMADA CRÍTICA PARA O ROTEIRO
             processarSegmentosRota(res);
         } else {
             alert("Erro ao traçar rota: " + status);
@@ -121,90 +115,100 @@ function executarRotaPrincipal(origem, destino) {
     });
 }
 
-// --- FUNÇÃO PARA PROCESSAR O ROTEIRO (SINTÉTICO / RESUMIDO) ---
+// --- FUNÇÃO DE ROTEIRO RESUMIDO (ESTILO GOOGLE SINTÉTICO) ---
 
 function processarSegmentosRota(res) {
-    const route = res.routes[0];
-    const legs = route.legs;
+    console.log("Processando roteiro resumido..."); // Verificação na consola
     const listaEscrita = document.getElementById("lista-passo-a-passo");
     
-    if (!listaEscrita) return;
+    if (!listaEscrita) {
+        console.error("Elemento lista-passo-a-passo não encontrado!");
+        return;
+    }
 
-    // FORÇAR LIMPEZA DA MENSAGEM "Calcule uma rota..."
+    // LIMPA TUDO (Remove a mensagem "Calcule uma rota...")
     listaEscrita.innerHTML = "";
 
-    let html = `<div style="padding: 15px; color: #1e293b; font-family: Arial, sans-serif;">`;
+    const legs = res.routes[0].legs;
+    let htmlFinal = `<div style="padding: 10px; font-family: 'Segoe UI', Tahoma, sans-serif;">`;
 
-    legs.forEach((leg) => {
-        // Cidade de Início
-        html += `<div style="font-weight: bold; font-size: 16px; margin-bottom: 20px; color: #1a73e8;">${leg.start_address.split(',')[0]}</div>`;
+    legs.forEach((leg, legIndex) => {
+        // Cidade de Origem (Ex: Jundiaí)
+        htmlFinal += `
+            <div style="margin-bottom: 20px;">
+                <div style="font-weight: bold; font-size: 16px; color: #1e293b;">${leg.start_address.split(',')[0]}</div>
+                <div style="font-size: 12px; color: #64748b;">${leg.start_address.split(',').slice(1).join(',')}</div>
+            </div>
+        `;
 
-        let resumoAgrupado = [];
-        let itemAtual = null;
+        let segmentosSinteticos = [];
+        let trechoAtual = null;
 
         leg.steps.forEach((step) => {
-            // Extrai as vias principais (tags <b>)
+            // Extrair nomes de rodovias em negrito
             const matches = step.instructions.match(/<b>(.*?)<\/b>/g) || [];
             const viaPrincipal = matches[0] ? matches[0].replace(/<[^>]*>?/gm, '') : "Vias locais";
 
-            // LÓGICA DE AGRUPAMENTO SINTÉTICO (Igual ao que o Google faz no painel lateral)
-            // Agrupamos se for a mesma via principal OU se o trecho for menor que 20km (manobras curtas)
-            if (itemAtual && (itemAtual.via === viaPrincipal || step.distance.value < 20000)) {
-                itemAtual.distancia += step.distance.value;
-                itemAtual.duracao += step.duration.value;
-                // Acumula as referências de via (ex: "via Rod. X, Rod Y")
+            // LÓGICA DE AGRUPAMENTO SINTÉTICO
+            // Se o passo for curto (< 25km) e não houver mudança drástica de via, agrupamos no resumo
+            if (trechoAtual && (trechoAtual.via === viaPrincipal || step.distance.value < 25000)) {
+                trechoAtual.distancia += step.distance.value;
+                trechoAtual.duracao += step.duration.value;
                 matches.forEach(m => {
                     let v = m.replace(/<[^>]*>?/gm, '');
-                    if(!itemAtual.viasMencionadas.includes(v)) itemAtual.viasMencionadas.push(v);
+                    if (!trechoAtual.viasNoTrecho.includes(v)) trechoAtual.viasNoTrecho.push(v);
                 });
             } else {
-                if (itemAtual) resumoAgrupado.push(itemAtual);
-                itemAtual = {
+                if (trechoAtual) segmentosSinteticos.push(trechoAtual);
+                trechoAtual = {
                     via: viaPrincipal,
-                    viasMencionadas: [...new Set(matches.map(m => m.replace(/<[^>]*>?/gm, '')))],
+                    viasNoTrecho: matches.map(m => m.replace(/<[^>]*>?/gm, '')),
                     distancia: step.distance.value,
                     duracao: step.duration.value,
-                    instrucaoLimpa: step.instructions.split('<div')[0]
+                    instrucaoBase: step.instructions.split('<div')[0]
                 };
             }
         });
-        if (itemAtual) resumoAgrupado.push(itemAtual);
+        if (trechoAtual) segmentosSinteticos.push(trechoAtual);
 
-        // Gerar o HTML dos blocos sintéticos
-        resumoAgrupado.forEach((bloco) => {
-            const km = (bloco.distancia / 1000).toFixed(1).replace('.', ',');
-            const horas = Math.floor(bloco.duracao / 3600);
-            const minutos = Math.round((bloco.duracao % 3600) / 60);
+        // Criar os blocos visuais
+        segmentosSinteticos.forEach((seg) => {
+            const km = (seg.distancia / 1000).toFixed(1).replace('.', ',');
+            const horas = Math.floor(seg.duracao / 3600);
+            const minutos = Math.round((seg.duracao % 3600) / 60);
             const tempoStr = horas > 0 ? `${horas} h ${minutos} min` : `${minutos} min`;
 
-            // Montagem do texto: "Pegue a [Via Principal] via [Outras Vias]"
-            let textoExibicao = bloco.instrucaoLimpa;
-            if (bloco.viasMencionadas.length > 1) {
-                const extras = bloco.viasMencionadas.slice(1, 4).join(', ');
-                textoExibicao = `Siga pela <b>${bloco.via}</b> via ${extras}`;
+            // Formatação: "Siga pela [Rodovia] via [Conexões]"
+            let descricao = seg.instrucaoBase;
+            if (seg.viasNoTrecho.length > 1) {
+                descricao = `Pegue a <b>${seg.via}</b> via ${seg.viasNoTrecho.slice(1, 4).join(', ')}`;
             }
 
-            html += `
-                <div style="display: flex; gap: 15px; margin-bottom: 25px; align-items: flex-start;">
-                    <div style="color: #5f6368; font-size: 18px; padding-top: 2px;"></div>
+            htmlFinal += `
+                <div style="display: flex; gap: 12px; margin-bottom: 25px; align-items: flex-start;">
+                    <div style="color: #94a3b8; font-size: 18px; line-height: 1;"></div>
                     <div style="flex: 1;">
-                        <div style="font-size: 14px; color: #202124; line-height: 1.4;">${textoExibicao}</div>
-                        <div style="font-size: 13px; color: #70757a; margin-top: 4px;">${tempoStr} (${km} km)</div>
+                        <div style="font-size: 14px; color: #1e293b; line-height: 1.5;">${descricao}</div>
+                        <div style="font-size: 12px; color: #64748b; margin-top: 4px; font-weight: 500;">${tempoStr} (${km} km)</div>
                     </div>
-                </div>`;
+                </div>
+            `;
         });
 
-        // Cidade de Destino
-        html += `<div style="font-weight: bold; font-size: 16px; margin-top: 10px; color: #1a73e8;">${leg.end_address.split(',')[0]}</div>`;
-        html += `<div style="font-size: 12px; color: #70757a; margin-bottom: 30px;">${leg.end_address.split(',').slice(1).join(',')}</div>`;
+        // Cidade de Destino (Ex: João Pessoa)
+        htmlFinal += `
+            <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #e2e8f0;">
+                <div style="font-weight: bold; font-size: 16px; color: #1e293b;">${leg.end_address.split(',')[0]}</div>
+                <div style="font-size: 12px; color: #64748b;">${leg.end_address.split(',').slice(1).join(',')}</div>
+            </div>
+        `;
     });
 
-    html += `</div>`;
-    
-    // INJETAR O CONTEÚDO NO PAINEL
-    listaEscrita.innerHTML = html;
+    htmlFinal += `</div>`;
+    listaEscrita.innerHTML = htmlFinal;
 
-    if (typeof atualizarFinanceiro === "function") atualizarFinanceiro();
+    // Atualizar financeiro após processar rota
+    atualizarFinanceiro();
 }
 
 // --- LÓGICA FINANCEIRA ---
