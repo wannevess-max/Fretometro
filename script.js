@@ -88,33 +88,56 @@ function formatarMoeda(input) {
 
 function atualizarFinanceiro() {
     if (!rotaIniciada) return;
+
     try {
-        const kmTotal = (distRotaMetros / 1000);
-        const kmVazio = (distVazioMetros / 1000);
+        // 1. Distâncias
+        const kmTotal = (distRotaMetros / 1000) || 0;
+        const kmVazio = (distVazioMetros / 1000) || 0;
         const kmGeral = kmTotal + kmVazio;
 
-        const dieselL = parseMoeda(document.getElementById("custoDieselLitro").value);
-        const consumoM = parseFloat(document.getElementById("consumoDieselMedia").value) || 0;
-        const arlaL = parseMoeda(document.getElementById("custoArlaLitro").value);
-        const arlaP = (parseFloat(document.getElementById("arlaPorcentagem").value) || 0) / 100;
-        const pedagio = parseMoeda(document.getElementById("custoPedagio").value);
-        const manutKm = parseMoeda(document.getElementById("custoManutencaoKm").value);
+        // 2. Captura do Valor por KM (O que você disse que já funciona)
         const freteKmInput = parseMoeda(document.getElementById("valorPorKm").value);
+
+        // 3. CÁLCULO DO DESLOCAMENTO (Onde está o erro)
+        let valorDeslocamentoFinal = 0;
+        const tipoDesloc = document.getElementById("tipoDeslocamento").value;
+
+        if (tipoDesloc === "remunerado_km") {
+            // Pega o valor que você digitou (Ex: 0,01)
+            const precoPorKmVazio = parseMoeda(document.getElementById("valorDeslocamentoKm").value);
+            // Multiplica pela distância de vazio calculada pelo Google
+            valorDeslocamentoFinal = kmVazio * precoPorKmVazio;
+        } else if (tipoDesloc === "remunerado_rs") {
+            // Pega o valor fixo total
+            valorDeslocamentoFinal = parseMoeda(document.getElementById("valorDeslocamentoTotal").value);
+        }
+
+        // 4. Outros valores
         const vDescarga = parseMoeda(document.getElementById("valorDescarga").value);
         const vOutras = parseMoeda(document.getElementById("valorOutrasDespesas").value);
 
-        // DESLOCAMENTO FUNCIONANDO NO RESUMO
-        // Cálculo do Deslocamento
-let vDeslocFinal = 0;
-const tipoD = document.getElementById("tipoDeslocamento").value;
-const kmVazio = (distVazioMetros / 1000) || 0;
+        // 5. Soma da Receita
+        const freteBase = freteKmInput * kmTotal;
+        const receitaLiquida = freteBase + valorDeslocamentoFinal + vDescarga + vOutras;
 
-if (tipoD === "remunerado_km") {
-    // Pega o R$ 0,01, limpa e multiplica pelo KM Vazio
-    const valorKmD = parseMoeda(document.getElementById("valorDeslocamentoKm").value);
-    vDeslocFinal = kmVazio * valorKmD;
-} else if (tipoD === "remunerado_rs") {
-    vDeslocFinal = parseMoeda(document.getElementById("valorDeslocamentoTotal").value);
+        // 6. Atualização do Resumo (IDs exatos do seu HTML)
+        const BRL = (n) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+        document.getElementById("txt-km-vazio-det").innerText = kmVazio.toFixed(1) + " km";
+        document.getElementById("txt-km-rota-det").innerText = kmTotal.toFixed(1) + " km";
+        document.getElementById("txt-km-total").innerText = kmGeral.toFixed(1) + " km";
+        
+        document.getElementById("txt-frete-base").innerText = BRL(freteBase);
+        
+        // ESTA LINHA ATUALIZA O DESLOCAMENTO NO RESUMO:
+        document.getElementById("txt-valor-deslocamento-fin").innerText = BRL(valorDeslocamentoFinal);
+
+        // Frete Total (Soma de tudo)
+        document.getElementById("txt-frete-total").innerText = BRL(receitaLiquida);
+
+    } catch (e) {
+        console.error("Erro no cálculo financeiro:", e);
+    }
 }
 
 // Injeta o resultado no resumo
@@ -279,4 +302,5 @@ function processarSegmentosRota(res) {
     listaEscrita.innerHTML = `<div style="padding:10px;"><strong>Origem:</strong> ${leg.start_address}<br><strong>Destino:</strong> ${leg.end_address}</div>`;
     atualizarFinanceiro();
 }
+
 
