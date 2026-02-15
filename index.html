@@ -87,23 +87,23 @@
             </li>
 
             <div class="deslocamento-config" style="background: var(--bg-sidebar); padding: 10px; border-radius: 8px; margin-bottom: 10px; border: 1px solid var(--border-color);">
-                <label class="label-custo" style="color: var(--accent-color); font-weight: bold;">TIPO DE DESLOCAMENTO</label>
-                <select id="tipoDeslocamento" onchange="atualizarFinanceiro()" style="margin-bottom: 10px;">
-                    <option value="nao_remunerado">Não Remunerado</option>
-                    <option value="remunerado_km">Remunerado R$ por KM vazio</option>
-                    <option value="remunerado_rs">Remunerado R$ Fechado Deslocamento</option>
-                </select>
-                
-                <div id="box-valor-deslocamento-km" style="display:none;">
-                    <label class="label-custo">VALOR KM VAZIO (R$)</label>
-                    <input id="valorDeslocamentoKm" type="text" value="R$ 0,00" oninput="formatarMoeda(this); atualizarFinanceiro();">
-                </div>
-                
-                <div id="box-valor-deslocamento-total" style="display:none;">
-                    <label class="label-custo">VALOR FECHADO (R$)</label>
-                    <input id="valorDeslocamentoTotal" type="text" value="R$ 0,00" oninput="formatarMoeda(this); atualizarFinanceiro();">
-                </div>
-            </div>
+    <label class="label-custo" style="color: var(--accent); font-weight: bold;">TIPO DE DESLOCAMENTO</label>
+    <select id="tipoDeslocamento" onchange="atualizarFinanceiro()" style="margin-bottom: 10px;">
+        <option value="nao_remunerado">Não Remunerado</option>
+        <option value="remunerado_km">Remunerado R$ por KM vazio</option>
+        <option value="remunerado_rs">Remunerado R$ Fechado Deslocamento</option>
+    </select>
+    
+    <div id="box-valor-deslocamento-km" style="display:none;">
+        <label class="label-custo">VALOR KM VAZIO (R$)</label>
+        <input id="inputValorDeslocamentoKm" type="text" value="R$ 0,00" oninput="formatarMoeda(this); atualizarFinanceiro();">
+    </div>
+    
+    <div id="box-valor-deslocamento-total" style="display:none;">
+        <label class="label-custo">VALOR FECHADO (R$)</label>
+        <input id="inputValorDeslocamentoTotal" type="text" value="R$ 0,00" oninput="formatarMoeda(this); atualizarFinanceiro();">
+    </div>
+</div>
 
             <li class="ponto-item sortable-item" id="li-origem">
                 <span class="handle">☰</span>
@@ -280,3 +280,4 @@
 <script src="script.js?v=1.0.2"></script>
 </body>
 </html>
+
