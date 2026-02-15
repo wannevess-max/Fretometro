@@ -2,7 +2,6 @@ let map, directionsRenderer, directionsService, rotaIniciada = false;
 let distVazioMetros = 0, distRotaMetros = 0;
 let frota = JSON.parse(localStorage.getItem('frota_db')) || [];
 
-// --- INICIALIZAÇÃO DO MAPA ---
 function initMap() {
     directionsService = new google.maps.DirectionsService();
     directionsRenderer = new google.maps.DirectionsRenderer({
@@ -32,7 +31,6 @@ function setupAutocomplete() {
     });
 }
 
-// --- LÓGICA DE ROTAS ---
 function calcularRota() {
     const origem = document.getElementById("origem").value;
     const destino = document.getElementById("destino").value;
@@ -71,7 +69,6 @@ function executarRotaPrincipal(origem, destino) {
     });
 }
 
-// --- FORMATAÇÃO E PARSE ---
 function formatarMoeda(input) {
     let valor = input.value.replace(/\D/g, "");
     if (!valor) {
@@ -90,7 +87,6 @@ function parseMoeda(valor) {
     return parseFloat(limpo) || 0;
 }
 
-// --- CÁLCULOS FINANCEIROS ---
 function atualizarFinanceiro() {
     if (!rotaIniciada) return;
 
@@ -142,7 +138,6 @@ function atualizarFinanceiro() {
         let custoFrio = 0;
         if(document.getElementById("tipoCarga").value === "frigorifica") {
             const consH = parseFloat(document.getElementById("consumoFrioHora").value) || 0;
-            // Cálculo simplificado de horas ou baseado em datas se necessário
             custoFrio = consH * dieselL * 5; 
         }
 
@@ -158,6 +153,9 @@ function atualizarFinanceiro() {
         document.getElementById("txt-valor-imp").innerText = valorImposto.toLocaleString('pt-BR', opt);
         document.getElementById("txt-frete-total").innerText = freteTotalComImposto.toLocaleString('pt-BR', opt);
         
+        const rKmReal = kmGeral > 0 ? (baseCalculoImposto / kmGeral) : 0;
+        document.getElementById("txt-km-real").innerText = "R$ " + rKmReal.toLocaleString('pt-BR', opt);
+
         if(document.getElementById("txt-an-diesel")) {
             document.getElementById("txt-an-diesel").innerText = custoCombustivel.toLocaleString('pt-BR', opt);
             document.getElementById("txt-an-arla").innerText = custoArla.toLocaleString('pt-BR', opt);
@@ -169,16 +167,15 @@ function atualizarFinanceiro() {
             document.getElementById("txt-an-imposto").innerText = valorImposto.toLocaleString('pt-BR', opt);
         }
 
-        const pVazio = kmGeral > 0 ? (kmVazio / kmGeral) * 100 : 0;
+        const pVazio = kmGeral > 0 ? (kmVazio / kmGeral * 100) : 0;
         document.getElementById("visual-vazio").style.width = pVazio + "%";
         document.getElementById("visual-rota").style.width = (100 - pVazio) + "%";
-        document.getElementById("perc-vazio").innerText = pVazio.toFixed(0) + "%";
-        document.getElementById("perc-rota").innerText = (100 - pVazio).toFixed(0) + "%";
+        document.getElementById("perc-vazio").innerText = pVazio.toFixed(1) + "%";
+        document.getElementById("perc-rota").innerText = (100 - pVazio).toFixed(1) + "%";
 
     } catch (e) { console.error("Erro financeiro:", e); }
 }
 
-// --- INTERFACE E EVENTOS ---
 document.addEventListener("DOMContentLoaded", function() {
     const camposMoeda = [
         "valorDeslocamentoKm", "valorDeslocamentoTotal", "valorPorKm", 
@@ -198,7 +195,6 @@ document.addEventListener("DOMContentLoaded", function() {
     document.getElementById("tipoDeslocamento")?.addEventListener('change', atualizarFinanceiro);
 });
 
-// --- FUNÇÕES DE INTERFACE ---
 function toggleCustos() {
     document.body.classList.toggle('custos-open');
     const isOpen = document.body.classList.contains('custos-open');
@@ -245,7 +241,6 @@ function adicionarParada() {
     autocomplete.addListener('place_changed', calcularRota);
 }
 
-// --- GESTÃO DE FROTA ---
 function salvarVeiculo() {
     const nome = document.getElementById("f-nome").value;
     if(!nome) return;
