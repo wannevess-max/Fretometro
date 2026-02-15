@@ -71,13 +71,18 @@ function executarRotaPrincipal(origem, destino) {
 
 // --- MOEDA ---
 function formatarMoeda(input) {
+    if (!input || !input.value) return;
+
     let valor = input.value.replace(/\D/g, "");
-    if (!valor) {
+
+    if (!valor || valor === "0") {
         input.value = "R$ 0,00";
         return;
     }
-    valor = (parseFloat(valor) / 100).toFixed(2);
-    input.value = "R$ " + valor
+
+    let valorNumerico = (parseFloat(valor) / 100).toFixed(2);
+
+    input.value = "R$ " + valorNumerico
         .replace(".", ",")
         .replace(/(\d)(?=(\d{3})+(?!\d))/g, "$1.");
 }
@@ -154,3 +159,4 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("tipoDeslocamento")
         ?.addEventListener("change", atualizarFinanceiro);
 });
+
