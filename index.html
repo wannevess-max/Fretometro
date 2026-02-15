@@ -96,7 +96,10 @@
     
     <div id="box-valor-deslocamento-km" style="display:none;">
         <label class="label-custo">VALOR KM VAZIO (R$)</label>
-        <input id="inputValorDeslocamentoKm" type="text" value="R$ 0,00">
+        <input id="inputValorDeslocamentoKm"
+       type="text"
+       value="R$ 0,00"
+       oninput="formatarMoeda(this); atualizarFinanceiro();">
     </div>
     
     <div id="box-valor-deslocamento-total" style="display:none;">
