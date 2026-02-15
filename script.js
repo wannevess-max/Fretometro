@@ -80,8 +80,9 @@ function executarRotaPrincipal(origem, destino) {
 // --- FORMATAÇÃO E PARSE (CORRIGIDOS) ---
 function formatarMoeda(input) {
     let valor = input.value.replace(/\D/g, "");
-    if (!valor) {
-        input.value = "";
+    // Se estiver vazio ou for zero, define como o padrão R$ 0,00
+    if (!valor || valor === "0") {
+        input.value = "R$ 0,00";
         return;
     }
     let valorNumerico = (parseFloat(valor) / 100).toFixed(2);
@@ -91,7 +92,8 @@ function formatarMoeda(input) {
 }
 
 function parseMoeda(valor) {
-    if (!valor) return 0;
+    if (!valor || valor === "R$ 0,00") return 0;
+    // Remove tudo que não é número ou vírgula, depois troca vírgula por ponto
     let limpo = valor.toString().replace(/R\$\s?|[.]|\s/g, "").replace(",", ".");
     return parseFloat(limpo) || 0;
 }
@@ -119,18 +121,22 @@ function atualizarFinanceiro() {
         const manutKm = parseMoeda(document.getElementById("custoManutencaoKm").value);
 
         // Lógica de Deslocamento
+        l// Lógica de Deslocamento corrigida
         let valorDeslocamentoFinal = 0;
         const tipoDesloc = document.getElementById("tipoDeslocamento").value;
-        const inputDeslocKm = document.getElementById("valorDeslocamentoKm");
-        const inputDeslocTotal = document.getElementById("valorDeslocamentoTotal");
+        
+        // Selecionamos as DIVS (containers) e não apenas os inputs
+        const boxKm = document.getElementById("box-valor-deslocamento-km");
+        const boxTotal = document.getElementById("box-valor-deslocamento-total");
 
-        inputDeslocKm.style.display = (tipoDesloc === "remunerado_km") ? "block" : "none";
-        inputDeslocTotal.style.display = (tipoDesloc === "remunerado_rs") ? "block" : "none";
+        if (boxKm) boxKm.style.display = (tipoDesloc === "remunerado_km") ? "block" : "none";
+        if (boxTotal) boxTotal.style.display = (tipoDesloc === "remunerado_rs") ? "block" : "none";
 
         if (tipoDesloc === "remunerado_km") {
-            valorDeslocamentoFinal = kmVazio * parseMoeda(inputDeslocKm.value);
+            const vKm = parseMoeda(document.getElementById("valorDeslocamentoKm").value);
+            valorDeslocamentoFinal = kmVazio * vKm;
         } else if (tipoDesloc === "remunerado_rs") {
-            valorDeslocamentoFinal = parseMoeda(inputDeslocTotal.value);
+            valorDeslocamentoFinal = parseMoeda(document.getElementById("valorDeslocamentoTotal").value);
         }
 
         const freteBase = freteKmInput * kmTotal;
@@ -199,9 +205,16 @@ function atualizarFinanceiro() {
 // --- EVENT LISTENER UNIFICADO ---
 document.addEventListener("DOMContentLoaded", function() {
     const camposMoeda = [
-        "valorDeslocamentoKm", "valorDeslocamentoTotal", "valorPorKm", 
-        "valorDescarga", "valorOutrasDespesas", "custoDieselLitro", 
-        "custoArlaLitro", "custoPedagio", "custoManutencaoKm", "f-manut"
+        "valorDeslocamentoKm", 
+        "valorDeslocamentoTotal", 
+        "valorPorKm", 
+        "valorDescarga", 
+        "valorOutrasDespesas", 
+        "custoDieselLitro", 
+        "custoArlaLitro", 
+        "custoPedagio", 
+        "custoManutencaoKm", 
+        "f-manut"
     ];
     camposMoeda.forEach(id => {
         const el = document.getElementById(id);
@@ -355,3 +368,4 @@ function limparPainelCustos() {
     toggleAparelhoFrio();
     atualizarFinanceiro();
 }
+
