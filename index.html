@@ -126,17 +126,17 @@
                 <span class="handle" style="cursor:default">📍</span>
                 <input id="saida" type="text" placeholder="Saída Deslocamento Vazio (Opcional)" autocomplete="off">
             </li>
-<div id="container-config-deslocamento" class="deslocamento-config">
-    <label style="font-size:10px; font-weight:700; color:var(--text-sub); margin-bottom:2px;">DESLOCAMENTO REMUNERADO</label>
-    <select id="tipoDeslocamento" onchange="atualizarFinanceiro()">
-        <option value="nao_remunerado">Não Remunerado</option>
-        <option value="remunerado_km">Remunerado R$ por KM vazio</option>
-        <option value="remunerado_rs">Remunerado R$ Fechado Deslocamento</option>
-    </select>
-    
-    <input id="valorDeslocamentoKm" type="text" placeholder="R$ 0,00 por KM" style="display:none;" oninput="formatarMoeda(this); atualizarFinanceiro();">
-    <input id="valorDeslocamentoTotal" type="text" placeholder="R$ 0,00 Total" style="display:none;" oninput="formatarMoeda(this); atualizarFinanceiro();">
-</div>
+            <div id="container-config-deslocamento" class="deslocamento-config">
+                <label style="font-size:10px; font-weight:700; color:var(--text-sub); margin-bottom:2px;">DESLOCAMENTO REMUNERADO</label>
+                <select id="tipoDeslocamento" onchange="atualizarFinanceiro()">
+                    <option value="nao_remunerado">Não Remunerado</option>
+                    <option value="remunerado_km">Remunerado R$ por KM vazio</option>
+                    <option value="remunerado_rs">Remunerado R$ Fechado Deslocamento</option>
+                </select>
+                
+                <input id="valorDeslocamentoKm" type="text" value="R$ 0,00" oninput="formatarMoeda(this); atualizarFinanceiro();" style="display:none;">
+                <input id="valorDeslocamentoTotal" type="text" value="R$ 0,00" oninput="formatarMoeda(this); atualizarFinanceiro();" style="display:none;">
+            </div>
             <li class="ponto-item sortable-item" id="li-origem">
                 <span class="handle">☰</span>
                 <input id="origem" type="text" placeholder="Origem" autocomplete="off">
@@ -146,7 +146,7 @@
                 <input id="destino" type="text" placeholder="Destino" autocomplete="off">
             </li>
         </ul>
-<div class="grid-configs" style="margin-top: 10px;">
+        <div class="grid-configs" style="margin-top: 10px;">
             <div>
                 <label class="label-custo">DESCARGA (R$)</label>
                 <input id="valorDescarga" type="text" value="R$ 0,00" oninput="formatarMoeda(this); atualizarFinanceiro();">
@@ -327,11 +327,3 @@
 <script src="script.js?v=1.0.2"></script>
 </body>
 </html>
-
-
-
-
-
-
-
-
