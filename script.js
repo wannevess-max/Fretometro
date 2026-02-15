@@ -138,20 +138,11 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    const deslocKm = document.getElementById("inputValorDeslocamentoKm");
-    if (deslocKm) {
-        deslocKm.addEventListener("input", function () {
-            formatarMoeda(this);
-        });
-    }
 
-    const deslocTotal = document.getElementById("inputValorDeslocamentoTotal");
-    if (deslocTotal) {
-        deslocTotal.addEventListener("input", function () {
-            formatarMoeda(this);
         });
     }
 
     document.getElementById("tipoDeslocamento")
         ?.addEventListener("change", atualizarFinanceiro);
 });
+
