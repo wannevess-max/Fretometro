@@ -69,22 +69,19 @@ function executarRotaPrincipal(origem, destino) {
     });
 }
 
-// --- MOEDA ---
+// --- MOEDA (CORREÇÃO CIRÚRGICA AQUI) ---
 function formatarMoeda(input) {
-    if (!input || !input.value) return;
+    if (!input || typeof input.value !== "string") return;
 
     let valor = input.value.replace(/\D/g, "");
 
-    if (!valor || valor === "0") {
-        input.value = "R$ 0,00";
-        return;
-    }
+    if (valor === "") valor = "0";
 
-    let valorNumerico = (parseFloat(valor) / 100).toFixed(2);
+    valor = (parseInt(valor, 10) / 100).toFixed(2);
 
-    input.value = "R$ " + valorNumerico
+    input.value = "R$ " + valor
         .replace(".", ",")
-        .replace(/(\d)(?=(\d{3})+(?!\d))/g, "$1.");
+        .replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 }
 
 function parseMoeda(v) {
@@ -141,7 +138,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    // 🔹 FORMATAÇÃO ISOLADA (SEM DUPLICAR CÁLCULO)
     const deslocKm = document.getElementById("inputValorDeslocamentoKm");
     if (deslocKm) {
         deslocKm.addEventListener("input", function () {
@@ -159,4 +155,3 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("tipoDeslocamento")
         ?.addEventListener("change", atualizarFinanceiro);
 });
-
