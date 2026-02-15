@@ -518,3 +518,12 @@ document.addEventListener("DOMContentLoaded", function() {
     const el = document.getElementById(id);
     if(el) el.addEventListener('input', atualizarFinanceiro);
 });
+// Gatilhos extras para garantir que o cálculo rode ao mudar as opções
+document.getElementById("tipoDeslocamento").addEventListener('change', atualizarFinanceiro);
+document.getElementById("imposto").addEventListener('change', atualizarFinanceiro);
+
+// Certifique-se de que os campos de valor do deslocamento também disparem o cálculo
+["valorDeslocamentoKm", "valorDeslocamentoTotal"].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.addEventListener('input', atualizarFinanceiro);
+});
