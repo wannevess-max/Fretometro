@@ -104,14 +104,21 @@ function atualizarFinanceiro() {
         const vOutras = parseMoeda(document.getElementById("valorOutrasDespesas").value);
 
         // DESLOCAMENTO FUNCIONANDO NO RESUMO
-        let valorDeslocamentoFinal = 0;
-        const tipoDesloc = document.getElementById("tipoDeslocamento").value;
-        if (tipoDesloc === "remunerado_km") {
-            const vKmDesloc = parseMoeda(document.getElementById("valorDeslocamentoKm").value);
-            valorDeslocamentoFinal = kmVazio * vKmDesloc;
-        } else if (tipoDesloc === "remunerado_rs") {
-            valorDeslocamentoFinal = parseMoeda(document.getElementById("valorDeslocamentoTotal").value);
-        }
+        // Cálculo do Deslocamento
+let vDeslocFinal = 0;
+const tipoD = document.getElementById("tipoDeslocamento").value;
+const kmVazio = (distVazioMetros / 1000) || 0;
+
+if (tipoD === "remunerado_km") {
+    // Pega o R$ 0,01, limpa e multiplica pelo KM Vazio
+    const valorKmD = parseMoeda(document.getElementById("valorDeslocamentoKm").value);
+    vDeslocFinal = kmVazio * valorKmD;
+} else if (tipoD === "remunerado_rs") {
+    vDeslocFinal = parseMoeda(document.getElementById("valorDeslocamentoTotal").value);
+}
+
+// Injeta o resultado no resumo
+document.getElementById("txt-valor-deslocamento-fin").innerText = vDeslocFinal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
         const freteBase = freteKmInput * kmTotal;
         const baseCalculoImposto = freteBase + valorDeslocamentoFinal + vDescarga + vOutras;
@@ -272,3 +279,4 @@ function processarSegmentosRota(res) {
     listaEscrita.innerHTML = `<div style="padding:10px;"><strong>Origem:</strong> ${leg.start_address}<br><strong>Destino:</strong> ${leg.end_address}</div>`;
     atualizarFinanceiro();
 }
+
