@@ -133,8 +133,9 @@
         <option value="remunerado_km">Remunerado R$ por KM vazio</option>
         <option value="remunerado_rs">Remunerado R$ Fechado Deslocamento</option>
     </select>
-    <input id="valorDeslocamentoKm" type="text" placeholder="R$ 0,00 por KM" style="display:none;">
-    <input id="valorDeslocamentoTotal" type="text" placeholder="R$ 0,00 Total" style="display:none;">
+    
+    <input id="valorDeslocamentoKm" type="text" placeholder="R$ 0,00 por KM" style="display:none;" oninput="formatarMoeda(this); atualizarFinanceiro();">
+    <input id="valorDeslocamentoTotal" type="text" placeholder="R$ 0,00 Total" style="display:none;" oninput="formatarMoeda(this); atualizarFinanceiro();">
 </div>
             <li class="ponto-item sortable-item" id="li-origem">
                 <span class="handle">☰</span>
@@ -326,6 +327,7 @@
 <script src="script.js?v=1.0.2"></script>
 </body>
 </html>
+
 
 
 
