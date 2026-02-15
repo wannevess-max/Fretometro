@@ -104,94 +104,67 @@ function atualizarFinanceiro() {
         const kmVazio = (distVazioMetros / 1000) || 0;
         const kmGeral = kmTotal + kmVazio;
 
-        // Inputs principais
-        const freteKmInput = parseMoeda(document.getElementById("valorPorKm").value);
-        const vDescarga = parseMoeda(document.getElementById("valorDescarga").value);
-        const vOutras = parseMoeda(document.getElementById("valorOutrasDespesas").value);
-        
-        // Custos adicionais
+        // Custos e Frete Base
         const dieselL = parseMoeda(document.getElementById("custoDieselLitro").value);
         const consumoM = parseFloat(document.getElementById("consumoDieselMedia").value) || 0;
         const arlaL = parseMoeda(document.getElementById("custoArlaLitro").value);
         const arlaP = (parseFloat(document.getElementById("arlaPorcentagem").value) || 0) / 100;
         const pedagio = parseMoeda(document.getElementById("custoPedagio").value);
         const manutKm = parseMoeda(document.getElementById("custoManutencaoKm").value);
+        const freteKmInput = parseMoeda(document.getElementById("valorPorKm").value);
+        const vDescarga = parseMoeda(document.getElementById("valorDescarga").value);
+        const vOutras = parseMoeda(document.getElementById("valorOutrasDespesas").value);
+        const impostoFator = parseFloat(document.getElementById("imposto").value) || 1;
 
-        // Lógica de Deslocamento Remunerado
+        // --- LÓGICA DE DESLOCAMENTO REMUNERADO ---
         let valorDeslocamentoFinal = 0;
         const tipoDesloc = document.getElementById("tipoDeslocamento").value;
         const boxKm = document.getElementById("box-valor-deslocamento-km");
         const boxTotal = document.getElementById("box-valor-deslocamento-total");
 
-        if (boxKm) boxKm.style.display = (tipoDesloc === "remunerado_km") ? "block" : "none";
-        if (boxTotal) boxTotal.style.display = (tipoDesloc === "remunerado_rs") ? "block" : "none";
+        // Mostra/Esconde os campos
+        if(boxKm) boxKm.style.display = (tipoDesloc === "remunerado_km") ? "block" : "none";
+        if(boxTotal) boxTotal.style.display = (tipoDesloc === "remunerado_rs") ? "block" : "none";
 
         if (tipoDesloc === "remunerado_km") {
-            valorDeslocamentoFinal = kmVazio * parseMoeda(document.getElementById("valorDeslocamentoKm").value);
+            const valInputKm = parseMoeda(document.getElementById("inputValorDeslocamentoKm").value);
+            valorDeslocamentoFinal = kmVazio * valInputKm;
         } else if (tipoDesloc === "remunerado_rs") {
-            valorDeslocamentoFinal = parseMoeda(document.getElementById("valorDeslocamentoTotal").value);
+            valorDeslocamentoFinal = parseMoeda(document.getElementById("inputValorDeslocamentoTotal").value);
         }
 
-        const freteBase = freteKmInput * kmTotal;
-        const baseCalculoImposto = freteBase + valorDeslocamentoFinal + vDescarga + vOutras;
+        // --- CÁLCULOS FINAIS ---
+        const freteBaseCarregado = freteKmInput * kmTotal;
+        // O Total agora soma: Frete Base + Deslocamento + Descarga + Outras
+        const totalBruto = freteBaseCarregado + valorDeslocamentoFinal + vDescarga + vOutras;
         
-        // Imposto
-        const impostoFator = parseFloat(document.getElementById("imposto").value) || 1;
-        let freteTotalComImposto = baseCalculoImposto;
+        let freteTotalComImposto = totalBruto;
         let valorImposto = 0;
         if (impostoFator < 1) {
-            freteTotalComImposto = baseCalculoImposto / impostoFator;
-            valorImposto = freteTotalComImposto - baseCalculoImposto;
+            freteTotalComImposto = totalBruto / impostoFator;
+            valorImposto = freteTotalComImposto - totalBruto;
         }
 
-        // Custos operacionais
+        // Custos Operacionais
         const custoCombustivel = consumoM > 0 ? (kmGeral / consumoM) * dieselL : 0;
         const custoArla = consumoM > 0 ? ((kmGeral / consumoM) * arlaP) * arlaL : 0;
         const custoManut = kmGeral * manutKm;
-        
-        let custoFrio = 0;
-        if(document.getElementById("tipoCarga").value === "frigorifica") {
-            const consH = parseFloat(document.getElementById("consumoFrioHora").value) || 0;
-            custoFrio = consH * dieselL * 5; 
-        }
+        const totalCustos = custoCombustivel + custoArla + custoManut + pedagio;
+        const lucro = totalBruto - totalCustos;
 
-        const totalCustos = custoCombustivel + custoArla + custoManut + pedagio + custoFrio;
-        const lucro = baseCalculoImposto - totalCustos;
-
-        // Atualização da UI
+        // --- ATUALIZAÇÃO DA TELA ---
         const opt = { style: 'currency', currency: 'BRL' };
         document.getElementById("txt-km-vazio-det").innerText = kmVazio.toFixed(1) + " km";
         document.getElementById("txt-km-rota-det").innerText = kmTotal.toFixed(1) + " km";
         document.getElementById("txt-km-total").innerText = kmGeral.toFixed(1) + " km";
-        document.getElementById("txt-frete-base").innerText = freteBase.toLocaleString('pt-BR', opt);
+        document.getElementById("txt-frete-base").innerText = freteBaseCarregado.toLocaleString('pt-BR', opt);
         document.getElementById("txt-valor-deslocamento-fin").innerText = valorDeslocamentoFinal.toLocaleString('pt-BR', opt);
         document.getElementById("txt-valor-imp").innerText = valorImposto.toLocaleString('pt-BR', opt);
         document.getElementById("txt-frete-total").innerText = freteTotalComImposto.toLocaleString('pt-BR', opt);
-        
-        const rKmReal = kmGeral > 0 ? (baseCalculoImposto / kmGeral) : 0;
-        document.getElementById("txt-km-real").innerText = rKmReal.toLocaleString('pt-BR', opt);
+        document.getElementById("txt-lucro-real").innerText = lucro.toLocaleString('pt-BR', opt);
+        document.getElementById("txt-km-real").innerText = (kmGeral > 0 ? (totalBruto / kmGeral) : 0).toLocaleString('pt-BR', opt);
 
-        // Painel Extra
-        if(document.getElementById("txt-an-diesel")) {
-            document.getElementById("txt-an-diesel").innerText = custoCombustivel.toLocaleString('pt-BR', opt);
-            document.getElementById("txt-an-arla").innerText = custoArla.toLocaleString('pt-BR', opt);
-            document.getElementById("txt-an-pedagio").innerText = pedagio.toLocaleString('pt-BR', opt);
-            document.getElementById("txt-an-manut").innerText = custoManut.toLocaleString('pt-BR', opt);
-            document.getElementById("txt-an-frio").innerText = custoFrio.toLocaleString('pt-BR', opt);
-            document.getElementById("txt-total-custos").innerText = totalCustos.toLocaleString('pt-BR', opt);
-            document.getElementById("txt-lucro-real").innerText = lucro.toLocaleString('pt-BR', opt);
-            document.getElementById("txt-frete-total-extra").innerText = freteTotalComImposto.toLocaleString('pt-BR', opt);
-            document.getElementById("txt-an-imposto").innerText = valorImposto.toLocaleString('pt-BR', opt);
-        }
-
-        // Gráfico
-        const pVazio = kmGeral > 0 ? (kmVazio / kmGeral) * 100 : 0;
-        document.getElementById("visual-vazio").style.width = pVazio + "%";
-        document.getElementById("visual-rota").style.width = (100 - pVazio) + "%";
-        document.getElementById("perc-vazio").innerText = pVazio.toFixed(0) + "%";
-        document.getElementById("perc-rota").innerText = (100 - pVazio).toFixed(0) + "%";
-
-    } catch (e) { console.error("Erro no cálculo financeiro:", e); }
+    } catch (e) { console.error("Erro no cálculo:", e); }
 }
 
 // --- EVENT LISTENER ---
@@ -363,3 +336,4 @@ function limparPainelCustos() {
     toggleAparelhoFrio();
     atualizarFinanceiro();
 }
+
