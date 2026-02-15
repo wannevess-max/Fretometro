@@ -116,75 +116,37 @@ function formatarMoeda(input) {
         .replace(".", ",")
         .replace(/(\d)(?=(\d{3})+(?!\d))/g, "$1.");
 }
-function atualizarFinanceiro() {
-    if (!rotaIniciada) return;
+// Dentro do try { ... } da sua função atualizarFinanceiro:
 
-    try {
-        const kmTotal = (distRotaMetros / 1000) || 0;
-        const kmVazio = (distVazioMetros / 1000) || 0;
-        const kmGeral = kmTotal + kmVazio;
-
-        // --- LEITURA DE INPUTS ---
-        const dieselL = parseMoeda(document.getElementById("custoDieselLitro").value);
-        const consumoM = parseFloat(document.getElementById("consumoDieselMedia").value) || 0;
-        const arlaL = parseMoeda(document.getElementById("custoArlaLitro").value);
-        const arlaP = (parseFloat(document.getElementById("arlaPorcentagem").value) || 0) / 100;
-        const pedagio = parseMoeda(document.getElementById("custoPedagio").value);
-        const manutKm = parseMoeda(document.getElementById("custoManutencaoKm").value);
-        const freteKmInput = parseMoeda(document.getElementById("valorPorKm").value);
-        const vDescarga = parseMoeda(document.getElementById("valorDescarga").value);
-        const vOutras = parseMoeda(document.getElementById("valorOutrasDespesas").value);
-        
-        // Pega o fator do imposto (Ex: 0.88 para 12%)
-        const impostoFator = parseFloat(document.getElementById("imposto").value) || 0;
-
-        // --- CÁLCULO DO DESLOCAMENTO ---
-        let valorDeslocamentoFinal = 0;
-        const tipoDesloc = document.getElementById("tipoDeslocamento").value;
-        
-        if (tipoDesloc === "remunerado_km") {
-            const vKmDesloc = parseMoeda(document.getElementById("valorDeslocamentoKm").value);
-            valorDeslocamentoFinal = kmVazio * vKmDesloc;
-        } else if (tipoDesloc === "remunerado_rs") {
-            valorDeslocamentoFinal = parseMoeda(document.getElementById("valorDeslocamentoTotal").value);
-        }
-
-        // --- RECEITA E IMPOSTO ---
-        const freteBase = freteKmInput * kmTotal;
-        const subTotal = freteBase + valorDeslocamentoFinal + vDescarga + vOutras;
-        
-        let freteTotal = subTotal;
-        let valorImposto = 0;
-
-        if (impostoFator > 0 && impostoFator < 1) {
-            // Cálculo por dentro: Faturamento Bruto = Líquido / (1 - Imposto)
-            freteTotal = subTotal / impostoFator;
-            valorImposto = freteTotal - subTotal;
-        }
-
-        // --- CUSTOS ---
-        const custoCombustivel = consumoM > 0 ? (kmGeral / consumoM) * dieselL : 0;
-        const custoArla = (consumoM > 0) ? ((kmGeral / consumoM) * arlaP) * arlaL : 0;
-        const custoManut = kmGeral * manutKm;
-        const totalCustos = custoCombustivel + custoArla + custoManut + pedagio;
-        const lucro = subTotal - totalCustos; // Lucro sobre o valor líquido
-
-        // --- ATUALIZAR UI ---
-        const opt = { style: 'currency', currency: 'BRL' };
-        
-        // Atualiza os textos de resumo
-        document.getElementById("txt-km-total").innerText = kmGeral.toFixed(1) + " km";
-        document.getElementById("txt-frete-base").innerText = freteBase.toLocaleString('pt-BR', opt);
-        document.getElementById("txt-valor-deslocamento-fin").innerText = valorDeslocamentoFinal.toLocaleString('pt-BR', opt);
-        document.getElementById("txt-valor-imp").innerText = valorImposto.toLocaleString('pt-BR', opt);
-        document.getElementById("txt-frete-total").innerText = freteTotal.toLocaleString('pt-BR', opt);
-        document.getElementById("txt-total-custos").innerText = totalCustos.toLocaleString('pt-BR', opt);
-        document.getElementById("txt-lucro-real").innerText = lucro.toLocaleString('pt-BR', opt);
-
-    } catch (e) {
-        console.error("Erro no cálculo:", e);
-    }
+// 1. Pega o valor do deslocamento baseado na escolha do usuário
+let vDeslocamento = 0;
+const tipoD = document.getElementById("tipoDeslocamento").value;
+if (tipoD === "remunerado_km") {
+    vDeslocamento = kmVazio * parseMoeda(document.getElementById("valorDeslocamentoKm").value);
+} else if (tipoD === "remunerado_rs") {
+    vDeslocamento = parseMoeda(document.getElementById("valorDeslocamentoTotal").value);
 }
+
+// 2. Base de Cálculo (Tudo que você recebe antes do imposto)
+const freteBase = freteKmInput * kmTotal;
+const totalReceitaLiquida = freteBase + vDeslocamento + vDescarga + vOutras;
+
+// 3. Imposto "Por Dentro" (Ex: Se fator for 0.88, divide por ele)
+const fatorImp = parseFloat(document.getElementById("imposto").value) || 1;
+let freteBrutoTotal = totalReceitaLiquida;
+let valorDoImposto = 0;
+
+if (fatorImp < 1) {
+    freteBrutoTotal = totalReceitaLiquida / fatorImp;
+    valorDoImposto = freteBrutoTotal - totalReceitaLiquida;
+}
+
+// 4. ATUALIZAÇÃO DOS CAMPOS DE RESUMO (O que você chama de Portal Real)
+const fM = (v) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+document.getElementById("txt-valor-deslocamento-fin").innerText = fM(vDeslocamento);
+document.getElementById("txt-valor-imp").innerText = fM(valorDoImposto);
+document.getElementById("txt-frete-total").innerText = fM(freteBrutoTotal);
 
 // --- INTERFACE E EVENTOS ---
 document.addEventListener("DOMContentLoaded", function() {
@@ -322,6 +284,7 @@ function processarSegmentosRota(res) {
     listaEscrita.innerHTML = `<div style="padding:10px;"><strong>Origem:</strong> ${leg.start_address}<br><strong>Destino:</strong> ${leg.end_address}</div>`;
     atualizarFinanceiro();
 }
+
 
 
 
