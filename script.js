@@ -2,7 +2,7 @@ let map, directionsRenderer, directionsService, rotaIniciada = false;
 let distVazioMetros = 0, distRotaMetros = 0;
 let frota = JSON.parse(localStorage.getItem('frota_db')) || [];
 
-// --- INICIALIZAÇÃO DO MAPA ---
+// --- MAPA ---
 function initMap() {
     directionsService = new google.maps.DirectionsService();
     directionsRenderer = new google.maps.DirectionsRenderer({
@@ -12,7 +12,8 @@ function initMap() {
 
     const centroBR = { lat: -15.793889, lng: -47.882778 };
     map = new google.maps.Map(document.getElementById("map"), {
-        zoom: 4, center: centroBR
+        zoom: 4,
+        center: centroBR
     });
 
     directionsRenderer.setMap(map);
@@ -23,11 +24,11 @@ function initMap() {
 function setupAutocomplete() {
     ["origem", "destino", "saida"].forEach(id => {
         const el = document.getElementById(id);
-        if (el) {
-            const ac = new google.maps.places.Autocomplete(el);
-            ac.addListener('place_changed', calcularRota);
-            el.addEventListener('blur', calcularRota);
-        }
+        if (!el) return;
+
+        const ac = new google.maps.places.Autocomplete(el);
+        ac.addListener("place_changed", calcularRota);
+        el.addEventListener("blur", calcularRota);
     });
 }
 
@@ -36,6 +37,7 @@ function calcularRota() {
     const origem = document.getElementById("origem").value;
     const destino = document.getElementById("destino").value;
     const saida = document.getElementById("saida").value;
+
     if (!origem || !destino) return;
 
     rotaIniciada = true;
@@ -44,9 +46,9 @@ function calcularRota() {
         directionsService.route({
             origin: saida,
             destination: origem,
-            travelMode: 'DRIVING'
+            travelMode: "DRIVING"
         }, (res, status) => {
-            distVazioMetros = status === 'OK' ? res.routes[0].legs[0].distance.value : 0;
+            distVazioMetros = status === "OK" ? res.routes[0].legs[0].distance.value : 0;
             executarRotaPrincipal(origem, destino);
         });
     } else {
@@ -59,27 +61,24 @@ function executarRotaPrincipal(origem, destino) {
     directionsService.route({
         origin: origem,
         destination: destino,
-        travelMode: 'DRIVING'
+        travelMode: "DRIVING"
     }, (res, status) => {
-        if (status === 'OK') {
-            directionsRenderer.setDirections(res);
-            distRotaMetros = res.routes[0].legs.reduce((a, l) => a + l.distance.value, 0);
-            atualizarFinanceiro();
-        }
+        if (status !== "OK") return;
+
+        directionsRenderer.setDirections(res);
+        distRotaMetros = res.routes[0].legs.reduce((a, l) => a + l.distance.value, 0);
+        atualizarFinanceiro();
     });
 }
 
-// --- MOEDA (CORREÇÃO CIRÚRGICA AQUI) ---
+// --- MOEDA (VERSÃO DEFINITIVA) ---
 function formatarMoeda(input) {
-    if (!input || typeof input.value !== "string") return;
+    let v = input.value.replace(/\D/g, "");
+    if (v === "") v = "0";
 
-    let valor = input.value.replace(/\D/g, "");
+    v = (parseInt(v, 10) / 100).toFixed(2);
 
-    if (valor === "") valor = "0";
-
-    valor = (parseInt(valor, 10) / 100).toFixed(2);
-
-    input.value = "R$ " + valor
+    input.value = "R$ " + v
         .replace(".", ",")
         .replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 }
@@ -94,55 +93,47 @@ function atualizarFinanceiro() {
     if (!rotaIniciada) return;
 
     const kmVazio = distVazioMetros / 1000;
-    const kmRota = distRotaMetros / 1000;
-
     const tipo = document.getElementById("tipoDeslocamento").value;
     let deslocamento = 0;
 
     if (tipo === "remunerado_km") {
-        deslocamento = kmVazio * parseMoeda(
-            document.getElementById("inputValorDeslocamentoKm").value
-        );
+        deslocamento =
+            kmVazio *
+            parseMoeda(document.getElementById("inputValorDeslocamentoKm").value);
     }
 
     if (tipo === "remunerado_rs") {
-        deslocamento = parseMoeda(
-            document.getElementById("inputValorDeslocamentoTotal").value
-        );
+        deslocamento =
+            parseMoeda(document.getElementById("inputValorDeslocamentoTotal").value);
     }
 
     document.getElementById("txt-valor-deslocamento-fin").innerText =
-        deslocamento.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+        deslocamento.toLocaleString("pt-BR", {
+            style: "currency",
+            currency: "BRL"
+        });
 }
 
-// --- EVENTOS ---
-document.addEventListener("DOMContentLoaded", () => {
+// --- LISTENER GLOBAL (CHAVE DA SOLUÇÃO) ---
+document.addEventListener("input", function (e) {
+    const el = e.target;
 
-    const camposMoeda = [
+    if (!el || el.tagName !== "INPUT") return;
+
+    const idsMoeda = [
         "valorPorKm",
         "valorDescarga",
         "valorOutrasDespesas",
         "custoDieselLitro",
         "custoArlaLitro",
         "custoPedagio",
-        "custoManutencaoKm"
+        "custoManutencaoKm",
+        "inputValorDeslocamentoKm",
+        "inputValorDeslocamentoTotal"
     ];
 
-    camposMoeda.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) {
-            el.addEventListener("input", function () {
-                formatarMoeda(this);
-                atualizarFinanceiro();
-            });
-        }
-    });
+    if (!idsMoeda.includes(el.id)) return;
 
-
-        });
-    }
-
-    document.getElementById("tipoDeslocamento")
-        ?.addEventListener("change", atualizarFinanceiro);
+    formatarMoeda(el);
+    atualizarFinanceiro();
 });
-
