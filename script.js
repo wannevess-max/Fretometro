@@ -170,10 +170,17 @@ function atualizarFinanceiro() {
 // --- EVENT LISTENER ---
 document.addEventListener("DOMContentLoaded", function() {
     const camposMoeda = [
-        "valorDeslocamentoKm", "valorDeslocamentoTotal", "valorPorKm", 
-        "valorDescarga", "valorOutrasDespesas", "custoDieselLitro", 
-        "custoArlaLitro", "custoPedagio", "custoManutencaoKm", "f-manut"
-    ];
+    "inputValorDeslocamentoKm",
+    "inputValorDeslocamentoTotal",
+    "valorPorKm",
+    "valorDescarga",
+    "valorOutrasDespesas",
+    "custoDieselLitro",
+    "custoArlaLitro",
+    "custoPedagio",
+    "custoManutencaoKm",
+    "f-manut"
+];
     camposMoeda.forEach(id => {
         const el = document.getElementById(id);
         if (el) {
@@ -336,4 +343,5 @@ function limparPainelCustos() {
     toggleAparelhoFrio();
     atualizarFinanceiro();
 }
+
 
