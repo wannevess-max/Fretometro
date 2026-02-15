@@ -31,7 +31,6 @@ function setupAutocomplete() {
             autocomplete.addListener('place_changed', () => {
                 calcularRota();
             });
-            // Adiciona gatilho ao perder o foco também
             el.addEventListener('blur', calcularRota);
         }
     });
@@ -89,68 +88,107 @@ function executarRotaPrincipal(origem, destino) {
 }
 
 // --- CÁLCULOS FINANCEIROS ---
+
 function parseMoeda(valor) {
     if (!valor) return 0;
-    // Remove R$, pontos de milhar e espaços, sobrando apenas a vírgula
-    let limpo = valor.toString().replace(/R\$\s?/, "").replace(/\./g, "").replace(/\s/g, "");
-    // Troca a vírgula por ponto para o JS entender como número decimal
-    limpo = limpo.replace(",", ".");
+    let limpo = valor.toString().replace(/[^\d,]/g, "").replace(",", ".");
     return parseFloat(limpo) || 0;
 }
 
 function formatarMoeda(input) {
-    // 1. Pega apenas os números
     let valor = input.value.replace(/\D/g, "");
+    if (!valor) { input.value = ""; return; }
     
-    // 2. Se estiver vazio, limpa e sai
-    if (!valor) {
-        input.value = "";
-        return;
-    }
-
-    // 3. Transforma em número e divide por 100 (faz o 1 virar 0.01)
+    // Regra: 1 vira 0,01
     let resultado = (parseFloat(valor) / 100).toFixed(2);
-
-    // 4. Formata para o padrão Brasileiro R$
+    
     input.value = "R$ " + resultado
         .replace(".", ",")
         .replace(/(\d)(?=(\d{3})+(?!\d))/g, "$1.");
 }
-// Dentro do try { ... } da sua função atualizarFinanceiro:
 
-// 1. Pega o valor do deslocamento baseado na escolha do usuário
-let vDeslocamento = 0;
-const tipoD = document.getElementById("tipoDeslocamento").value;
-if (tipoD === "remunerado_km") {
-    vDeslocamento = kmVazio * parseMoeda(document.getElementById("valorDeslocamentoKm").value);
-} else if (tipoD === "remunerado_rs") {
-    vDeslocamento = parseMoeda(document.getElementById("valorDeslocamentoTotal").value);
+function atualizarFinanceiro() {
+    if (!rotaIniciada) return;
+
+    try {
+        const kmTotal = (distRotaMetros / 1000) || 0;
+        const kmVazio = (distVazioMetros / 1000) || 0;
+        const kmGeral = kmTotal + kmVazio;
+
+        // Leitura de Inputs
+        const dieselL = parseMoeda(document.getElementById("custoDieselLitro").value);
+        const consumoM = parseFloat(document.getElementById("consumoDieselMedia").value) || 0;
+        const arlaL = parseMoeda(document.getElementById("custoArlaLitro").value);
+        const arlaP = (parseFloat(document.getElementById("arlaPorcentagem").value) || 0) / 100;
+        const pedagio = parseMoeda(document.getElementById("custoPedagio").value);
+        const manutKm = parseMoeda(document.getElementById("custoManutencaoKm").value);
+        const freteKmInput = parseMoeda(document.getElementById("valorPorKm").value);
+        const vDescarga = parseMoeda(document.getElementById("valorDescarga").value);
+        const vOutras = parseMoeda(document.getElementById("valorOutrasDespesas").value);
+
+        // 1. Cálculo do Deslocamento
+        let vDeslocamento = 0;
+        const tipoD = document.getElementById("tipoDeslocamento").value;
+        if (tipoD === "remunerado_km") {
+            vDeslocamento = kmVazio * parseMoeda(document.getElementById("valorDeslocamentoKm").value);
+        } else if (tipoD === "remunerado_rs") {
+            vDeslocamento = parseMoeda(document.getElementById("valorDeslocamentoTotal").value);
+        }
+
+        // 2. Receita e Imposto
+        const freteBase = freteKmInput * kmTotal;
+        const totalLiquido = freteBase + vDeslocamento + vDescarga + vOutras;
+
+        const fatorImp = parseFloat(document.getElementById("imposto").value) || 1;
+        let freteBrutoTotal = totalLiquido;
+        let valorDoImposto = 0;
+
+        if (fatorImp < 1 && fatorImp > 0) {
+            freteBrutoTotal = totalLiquido / fatorImp;
+            valorDoImposto = freteBrutoTotal - totalLiquido;
+        }
+
+        // 3. Custos Operacionais
+        const custoCombustivel = consumoM > 0 ? (kmGeral / consumoM) * dieselL : 0;
+        const custoArla = (consumoM > 0) ? ((kmGeral / consumoM) * arlaP) * arlaL : 0;
+        const custoManut = kmGeral * manutKm;
+        const totalCustos = custoCombustivel + custoArla + custoManut + pedagio;
+        const lucroFinal = totalLiquido - totalCustos;
+
+        // 4. Atualização da UI
+        const fM = (v) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+        document.getElementById("txt-km-total").innerText = kmGeral.toFixed(1) + " km";
+        document.getElementById("txt-km-vazio-det").innerText = kmVazio.toFixed(1) + " km";
+        document.getElementById("txt-km-rota-det").innerText = kmTotal.toFixed(1) + " km";
+        
+        document.getElementById("txt-frete-base").innerText = fM(freteBase);
+        document.getElementById("txt-valor-deslocamento-fin").innerText = fM(vDeslocamento);
+        document.getElementById("txt-valor-imp").innerText = fM(valorDoImposto);
+        document.getElementById("txt-frete-total").innerText = fM(freteBrutoTotal);
+        
+        if(document.getElementById("txt-an-diesel")) {
+            document.getElementById("txt-an-diesel").innerText = fM(custoCombustivel);
+            document.getElementById("txt-an-arla").innerText = fM(custoArla);
+            document.getElementById("txt-an-pedagio").innerText = fM(pedagio);
+            document.getElementById("txt-an-manut").innerText = fM(custoManut);
+            document.getElementById("txt-total-custos").innerText = fM(totalCustos);
+            document.getElementById("txt-lucro-real").innerText = fM(lucroFinal);
+        }
+
+        const pVazio = kmGeral > 0 ? (kmVazio / kmGeral) * 100 : 0;
+        document.getElementById("visual-vazio").style.width = pVazio + "%";
+        document.getElementById("visual-rota").style.width = (100 - pVazio) + "%";
+        document.getElementById("perc-vazio").innerText = pVazio.toFixed(0) + "%";
+        document.getElementById("perc-rota").innerText = (100 - pVazio).toFixed(0) + "%";
+
+    } catch (e) {
+        console.error("Erro financeiro:", e);
+    }
 }
-
-// 2. Base de Cálculo (Tudo que você recebe antes do imposto)
-const freteBase = freteKmInput * kmTotal;
-const totalReceitaLiquida = freteBase + vDeslocamento + vDescarga + vOutras;
-
-// 3. Imposto "Por Dentro" (Ex: Se fator for 0.88, divide por ele)
-const fatorImp = parseFloat(document.getElementById("imposto").value) || 1;
-let freteBrutoTotal = totalReceitaLiquida;
-let valorDoImposto = 0;
-
-if (fatorImp < 1) {
-    freteBrutoTotal = totalReceitaLiquida / fatorImp;
-    valorDoImposto = freteBrutoTotal - totalReceitaLiquida;
-}
-
-// 4. ATUALIZAÇÃO DOS CAMPOS DE RESUMO (O que você chama de Portal Real)
-const fM = (v) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-
-document.getElementById("txt-valor-deslocamento-fin").innerText = fM(vDeslocamento);
-document.getElementById("txt-valor-imp").innerText = fM(valorDoImposto);
-document.getElementById("txt-frete-total").innerText = fM(freteBrutoTotal);
 
 // --- INTERFACE E EVENTOS ---
 document.addEventListener("DOMContentLoaded", function() {
-    // Lista exata dos IDs dos campos de dinheiro
     const camposDinheiro = [
         "valorDeslocamentoKm", "valorDeslocamentoTotal", "valorPorKm", 
         "valorDescarga", "valorOutrasDespesas", "custoDieselLitro", 
@@ -160,19 +198,29 @@ document.addEventListener("DOMContentLoaded", function() {
     camposDinheiro.forEach(id => {
         const el = document.getElementById(id);
         if (el) {
-            // Usamos 'input' para que o cálculo seja em tempo real
             el.addEventListener('input', function() {
-                formatarMoeda(this);      // 1º Formata o visual (1 -> 0,01)
-                atualizarFinanceiro();    // 2º Faz a conta e joga no resumo
+                formatarMoeda(this);
+                atualizarFinanceiro();
             });
         }
     });
 
-    // Gatilhos extras (Selects)
     document.getElementById("imposto")?.addEventListener('change', atualizarFinanceiro);
-    document.getElementById("tipoDeslocamento")?.addEventListener('change', atualizarFinanceiro);
+    document.getElementById("tipoDeslocamento")?.addEventListener('change', function() {
+        const campoKm = document.getElementById("valorDeslocamentoKm");
+        const campoRs = document.getElementById("valorDeslocamentoTotal");
+        if(campoKm) campoKm.style.display = (this.value === "remunerado_km") ? "block" : "none";
+        if(campoRs) campoRs.style.display = (this.value === "remunerado_rs") ? "block" : "none";
+        atualizarFinanceiro();
+    });
+
+    document.getElementById("saida")?.addEventListener('input', function() {
+        const container = document.getElementById("container-config-deslocamento");
+        if(container) container.style.display = (this.value.trim() !== "") ? "flex" : "none";
+    });
 });
 
+// --- FUNÇÕES DE SUPORTE UI ---
 function toggleCustos() {
     document.body.classList.toggle('custos-open');
     const isOpen = document.body.classList.contains('custos-open');
@@ -183,14 +231,14 @@ function toggleCustos() {
 
 function toggleFrota() { 
     const painel = document.getElementById('painel-frota');
-    painel.classList.toggle('active');
+    if(painel) painel.classList.toggle('active');
     renderFrota();
 }
 
 function toggleGoogleMaps() {
     const painel = document.getElementById('painel-roteiro-escrito');
-    painel.classList.toggle('active');
-    localStorage.setItem('keep_roteiro', painel.classList.contains('active'));
+    if(painel) painel.classList.toggle('active');
+    localStorage.setItem('keep_roteiro', painel?.classList.contains('active'));
 }
 
 function restaurarPosicaoPaineis() {
@@ -204,9 +252,11 @@ function restaurarPosicaoPaineis() {
 function toggleAparelhoFrio() {
     const tipo = document.getElementById("tipoCarga").value;
     const isFrio = tipo === "frigorifica";
-    document.getElementById("container-frio-input").style.display = isFrio ? "block" : "none";
-    document.getElementById("row-an-frio").style.display = isFrio ? "flex" : "none";
-    document.getElementById("container-frio-datas").style.display = isFrio ? "block" : "none";
+    const ids = ["container-frio-input", "row-an-frio", "container-frio-datas"];
+    ids.forEach(id => {
+        const el = document.getElementById(id);
+        if(el) el.style.display = isFrio ? "block" : "none";
+    });
     atualizarFinanceiro();
 }
 
@@ -281,12 +331,8 @@ function vincularFrota(elem) {
 function processarSegmentosRota(res) {
     const leg = res.routes[0].legs[0];
     const listaEscrita = document.getElementById("lista-passo-a-passo");
-    listaEscrita.innerHTML = `<div style="padding:10px;"><strong>Origem:</strong> ${leg.start_address}<br><strong>Destino:</strong> ${leg.end_address}</div>`;
+    if(listaEscrita) {
+        listaEscrita.innerHTML = `<div style="padding:10px;"><strong>Origem:</strong> ${leg.start_address}<br><strong>Destino:</strong> ${leg.end_address}</div>`;
+    }
     atualizarFinanceiro();
 }
-
-
-
-
-
-
