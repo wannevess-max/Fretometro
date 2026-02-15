@@ -126,6 +126,7 @@
                 <span class="handle" style="cursor:default">📍</span>
                 <input id="saida" type="text" placeholder="Saída Deslocamento Vazio (Opcional)" autocomplete="off">
             </li>
+            
             <div id="container-config-deslocamento" class="deslocamento-config">
                 <label style="font-size:10px; font-weight:700; color:var(--text-sub); margin-bottom:2px;">DESLOCAMENTO REMUNERADO</label>
                 <select id="tipoDeslocamento" onchange="atualizarFinanceiro()">
@@ -137,6 +138,7 @@
                 <input id="valorDeslocamentoKm" type="text" value="R$ 0,00" oninput="formatarMoeda(this); atualizarFinanceiro();" style="display:none;">
                 <input id="valorDeslocamentoTotal" type="text" value="R$ 0,00" oninput="formatarMoeda(this); atualizarFinanceiro();" style="display:none;">
             </div>
+
             <li class="ponto-item sortable-item" id="li-origem">
                 <span class="handle">☰</span>
                 <input id="origem" type="text" placeholder="Origem" autocomplete="off">
@@ -146,6 +148,7 @@
                 <input id="destino" type="text" placeholder="Destino" autocomplete="off">
             </li>
         </ul>
+
         <div class="grid-configs" style="margin-top: 10px;">
             <div>
                 <label class="label-custo">DESCARGA (R$)</label>
@@ -156,6 +159,7 @@
                 <input id="valorOutrasDespesas" type="text" value="R$ 0,00" oninput="formatarMoeda(this); atualizarFinanceiro();">
             </div>
         </div>
+
         <button class="btn-add" id="btnAddParada" onclick="adicionarParada()">+ Adicionar Parada</button>
 
         <div class="grid-configs">
