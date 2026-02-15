@@ -99,10 +99,22 @@ function parseMoeda(valor) {
 }
 
 function formatarMoeda(input) {
-    let valor = input.value.replace(/\D/g, ""); // Remove tudo que não é número
-    if (valor === "") { input.value = ""; return; }
-    valor = (parseFloat(valor) / 100).toFixed(2); // Faz o "1 = 0,01"
-    input.value = "R$ " + valor.replace(".", ",").replace(/(\d)(?=(\d{3})+(?!\d))/g, "$1.");
+    // 1. Pega apenas os números
+    let valor = input.value.replace(/\D/g, "");
+    
+    // 2. Se estiver vazio, limpa e sai
+    if (!valor) {
+        input.value = "";
+        return;
+    }
+
+    // 3. Transforma em número e divide por 100 (faz o 1 virar 0.01)
+    let resultado = (parseFloat(valor) / 100).toFixed(2);
+
+    // 4. Formata para o padrão Brasileiro R$
+    input.value = "R$ " + resultado
+        .replace(".", ",")
+        .replace(/(\d)(?=(\d{3})+(?!\d))/g, "$1.");
 }
 function atualizarFinanceiro() {
     if (!rotaIniciada) return;
@@ -176,48 +188,27 @@ function atualizarFinanceiro() {
 
 // --- INTERFACE E EVENTOS ---
 document.addEventListener("DOMContentLoaded", function() {
-    // A. Formatação Dinâmica (1 = 0,01)
-    const camposMoeda = ["valorDeslocamentoKm", "valorDeslocamentoTotal", "valorPorKm", "valorDescarga", "valorOutrasDespesas", "custoDieselLitro", "custoArlaLitro", "custoPedagio", "custoManutencaoKm"];
-    
-    camposMoeda.forEach(id => {
-        document.getElementById(id)?.addEventListener('input', function() {
-            formatarMoeda(this); 
-        });
-    });
+    // Lista exata dos IDs dos campos de dinheiro
+    const camposDinheiro = [
+        "valorDeslocamentoKm", "valorDeslocamentoTotal", "valorPorKm", 
+        "valorDescarga", "valorOutrasDespesas", "custoDieselLitro", 
+        "custoArlaLitro", "custoPedagio", "custoManutencaoKm"
+    ];
 
-    // B. Monitor de Inputs para Recalcular
-    const inputsFinanceiros = [...camposMoeda, "consumoDieselMedia", "arlaPorcentagem", "consumoFrioHora"];
-    inputsFinanceiros.forEach(id => {
-        document.getElementById(id)?.addEventListener('input', atualizarFinanceiro);
-    });
-
-    // C. Gatilhos de Seleção
-    document.getElementById("imposto")?.addEventListener('change', atualizarFinanceiro);
-    document.getElementById("tipoCarga")?.addEventListener('change', function() {
-        toggleAparelhoFrio();
-        atualizarFinanceiro();
-    });
-
-    // D. Lógica de Deslocamento
-    const selectDesloc = document.getElementById("tipoDeslocamento");
-    selectDesloc?.addEventListener('change', function() {
-        document.getElementById("valorDeslocamentoKm").style.display = (this.value === "remunerado_km") ? "block" : "none";
-        document.getElementById("valorDeslocamentoTotal").style.display = (this.value === "remunerado_rs") ? "block" : "none";
-        atualizarFinanceiro();
-    });
-
-    // E. Campo de Saída
-    const campoSaida = document.getElementById("saida");
-    campoSaida?.addEventListener('input', function() {
-        const container = document.getElementById("container-config-deslocamento");
-        if(this.value.trim() !== "") {
-            container.style.display = "flex";
-        } else {
-            container.style.display = "none";
-            if(selectDesloc) selectDesloc.value = "nao_remunerado";
-            atualizarFinanceiro();
+    camposDinheiro.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            // Usamos 'input' para que o cálculo seja em tempo real
+            el.addEventListener('input', function() {
+                formatarMoeda(this);      // 1º Formata o visual (1 -> 0,01)
+                atualizarFinanceiro();    // 2º Faz a conta e joga no resumo
+            });
         }
     });
+
+    // Gatilhos extras (Selects)
+    document.getElementById("imposto")?.addEventListener('change', atualizarFinanceiro);
+    document.getElementById("tipoDeslocamento")?.addEventListener('change', atualizarFinanceiro);
 });
 
 function toggleCustos() {
@@ -331,6 +322,7 @@ function processarSegmentosRota(res) {
     listaEscrita.innerHTML = `<div style="padding:10px;"><strong>Origem:</strong> ${leg.start_address}<br><strong>Destino:</strong> ${leg.end_address}</div>`;
     atualizarFinanceiro();
 }
+
 
 
 
