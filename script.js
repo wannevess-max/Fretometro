@@ -531,43 +531,41 @@ document.getElementById("imposto").addEventListener('change', atualizarFinanceir
     if(el) el.addEventListener('input', atualizarFinanceiro);
 });
 
-// --- INICIALIZAÇÃO DE GATILHOS ---
+// --- INICIALIZAÇÃO ÚNICA DE GATILHOS ---
 document.addEventListener("DOMContentLoaded", function() {
-    // Monitora mudanças em todos os campos numéricos e de texto financeiros
-    const idsFinanceiros = [
+    // 1. Lista compacta de todos os IDs que devem atualizar o cálculo ao digitar
+    const idsParaMonitorar = [
         "valorPorKm", "valorDescarga", "valorOutrasDespesas", 
         "valorDeslocamentoKm", "valorDeslocamentoTotal",
         "custoDieselLitro", "consumoDieselMedia", "custoArlaLitro", 
         "arlaPorcentagem", "custoPedagio", "custoManutencaoKm", "consumoFrioHora"
     ];
 
-    idsFinanceiros.forEach(id => {
-        const el = document.getElementById(id);
-        if(el) el.addEventListener('input', atualizarFinanceiro);
+    idsParaMonitorar.forEach(id => {
+        document.getElementById(id)?.addEventListener('input', atualizarFinanceiro);
     });
 
-    // Monitora mudanças nos selects (Imposto e Tipo de Deslocamento)
+    // 2. Selects (Mudança de valor)
     document.getElementById("imposto")?.addEventListener('change', atualizarFinanceiro);
-    document.getElementById("tipoDeslocamento")?.addEventListener('change', function() {
-        // Mostra/Esconde os campos de valor de deslocamento
-        const inputKm = document.getElementById("valorDeslocamentoKm");
-        const inputTotal = document.getElementById("valorDeslocamentoTotal");
-        
-        inputKm.style.display = (this.value === "remunerado_km") ? "block" : "none";
-        inputTotal.style.display = (this.value === "remunerado_rs") ? "block" : "none";
-        
-        atualizarFinanceiro();
-    });
+    
+    // 3. Lógica do campo de Saída e Menu de Deslocamento
+    const campoSaida = document.getElementById("saida");
+    const selectTipo = document.getElementById("tipoDeslocamento");
 
-    // Gatilho para o campo de Saída (Vazio) mostrar o menu de deslocamento
-    document.getElementById("saida")?.addEventListener('input', function() {
+    campoSaida?.addEventListener('input', function() {
         const container = document.getElementById("container-config-deslocamento");
         if(this.value.trim() !== "") {
             container.style.display = "flex";
         } else {
             container.style.display = "none";
-            document.getElementById("tipoDeslocamento").value = "nao_remunerado";
+            if(selectTipo) selectTipo.value = "nao_remunerado";
             atualizarFinanceiro();
         }
+    });
+
+    selectTipo?.addEventListener('change', function() {
+        document.getElementById("valorDeslocamentoKm").style.display = (this.value === "remunerado_km") ? "block" : "none";
+        document.getElementById("valorDeslocamentoTotal").style.display = (this.value === "remunerado_rs") ? "block" : "none";
+        atualizarFinanceiro();
     });
 });
