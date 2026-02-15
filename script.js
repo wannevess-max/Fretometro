@@ -19,7 +19,6 @@ function initMap() {
     setupAutocomplete();
     restaurarPosicaoPaineis();
     
-    // Inicializa Sortable se o elemento existir
     const el = document.getElementById('lista-pontos');
     if (el && typeof Sortable !== 'undefined') {
         Sortable.create(el, { handle: '.handle', animation: 150, onEnd: calcularRota });
@@ -77,10 +76,9 @@ function executarRotaPrincipal(origem, destino) {
     });
 }
 
-// --- FORMATAÇÃO E PARSE (CORRIGIDOS) ---
+// --- FORMATAÇÃO E PARSE (CORRIGIDOS PARA IDENTIDADE TOTAL) ---
 function formatarMoeda(input) {
     let valor = input.value.replace(/\D/g, "");
-    // Se estiver vazio ou for zero, define como o padrão R$ 0,00
     if (!valor || valor === "0") {
         input.value = "R$ 0,00";
         return;
@@ -93,12 +91,11 @@ function formatarMoeda(input) {
 
 function parseMoeda(valor) {
     if (!valor || valor === "R$ 0,00") return 0;
-    // Remove tudo que não é número ou vírgula, depois troca vírgula por ponto
     let limpo = valor.toString().replace(/R\$\s?|[.]|\s/g, "").replace(",", ".");
     return parseFloat(limpo) || 0;
 }
 
-// --- CÁLCULOS FINANCEIROS COMPLETOS ---
+// --- CÁLCULOS FINANCEIROS ---
 function atualizarFinanceiro() {
     if (!rotaIniciada) return;
 
@@ -112,7 +109,7 @@ function atualizarFinanceiro() {
         const vDescarga = parseMoeda(document.getElementById("valorDescarga").value);
         const vOutras = parseMoeda(document.getElementById("valorOutrasDespesas").value);
         
-        // Custos adicionais do painel extra
+        // Custos adicionais
         const dieselL = parseMoeda(document.getElementById("custoDieselLitro").value);
         const consumoM = parseFloat(document.getElementById("consumoDieselMedia").value) || 0;
         const arlaL = parseMoeda(document.getElementById("custoArlaLitro").value);
@@ -120,12 +117,9 @@ function atualizarFinanceiro() {
         const pedagio = parseMoeda(document.getElementById("custoPedagio").value);
         const manutKm = parseMoeda(document.getElementById("custoManutencaoKm").value);
 
-        // Lógica de Deslocamento
-        l// Lógica de Deslocamento corrigida
+        // Lógica de Deslocamento Remunerado
         let valorDeslocamentoFinal = 0;
         const tipoDesloc = document.getElementById("tipoDeslocamento").value;
-        
-        // Selecionamos as DIVS (containers) e não apenas os inputs
         const boxKm = document.getElementById("box-valor-deslocamento-km");
         const boxTotal = document.getElementById("box-valor-deslocamento-total");
 
@@ -133,8 +127,7 @@ function atualizarFinanceiro() {
         if (boxTotal) boxTotal.style.display = (tipoDesloc === "remunerado_rs") ? "block" : "none";
 
         if (tipoDesloc === "remunerado_km") {
-            const vKm = parseMoeda(document.getElementById("valorDeslocamentoKm").value);
-            valorDeslocamentoFinal = kmVazio * vKm;
+            valorDeslocamentoFinal = kmVazio * parseMoeda(document.getElementById("valorDeslocamentoKm").value);
         } else if (tipoDesloc === "remunerado_rs") {
             valorDeslocamentoFinal = parseMoeda(document.getElementById("valorDeslocamentoTotal").value);
         }
@@ -159,7 +152,6 @@ function atualizarFinanceiro() {
         let custoFrio = 0;
         if(document.getElementById("tipoCarga").value === "frigorifica") {
             const consH = parseFloat(document.getElementById("consumoFrioHora").value) || 0;
-            // Aqui você pode adicionar lógica de horas reais se desejar
             custoFrio = consH * dieselL * 5; 
         }
 
@@ -179,7 +171,7 @@ function atualizarFinanceiro() {
         const rKmReal = kmGeral > 0 ? (baseCalculoImposto / kmGeral) : 0;
         document.getElementById("txt-km-real").innerText = rKmReal.toLocaleString('pt-BR', opt);
 
-        // Painel Extra de Custos
+        // Painel Extra
         if(document.getElementById("txt-an-diesel")) {
             document.getElementById("txt-an-diesel").innerText = custoCombustivel.toLocaleString('pt-BR', opt);
             document.getElementById("txt-an-arla").innerText = custoArla.toLocaleString('pt-BR', opt);
@@ -192,7 +184,7 @@ function atualizarFinanceiro() {
             document.getElementById("txt-an-imposto").innerText = valorImposto.toLocaleString('pt-BR', opt);
         }
 
-        // Gráfico de barras
+        // Gráfico
         const pVazio = kmGeral > 0 ? (kmVazio / kmGeral) * 100 : 0;
         document.getElementById("visual-vazio").style.width = pVazio + "%";
         document.getElementById("visual-rota").style.width = (100 - pVazio) + "%";
@@ -202,19 +194,12 @@ function atualizarFinanceiro() {
     } catch (e) { console.error("Erro no cálculo financeiro:", e); }
 }
 
-// --- EVENT LISTENER UNIFICADO ---
+// --- EVENT LISTENER ---
 document.addEventListener("DOMContentLoaded", function() {
     const camposMoeda = [
-        "valorDeslocamentoKm", 
-        "valorDeslocamentoTotal", 
-        "valorPorKm", 
-        "valorDescarga", 
-        "valorOutrasDespesas", 
-        "custoDieselLitro", 
-        "custoArlaLitro", 
-        "custoPedagio", 
-        "custoManutencaoKm", 
-        "f-manut"
+        "valorDeslocamentoKm", "valorDeslocamentoTotal", "valorPorKm", 
+        "valorDescarga", "valorOutrasDespesas", "custoDieselLitro", 
+        "custoArlaLitro", "custoPedagio", "custoManutencaoKm", "f-manut"
     ];
     camposMoeda.forEach(id => {
         const el = document.getElementById(id);
@@ -230,7 +215,6 @@ document.addEventListener("DOMContentLoaded", function() {
     document.getElementById("tipoDeslocamento")?.addEventListener('change', atualizarFinanceiro);
     document.getElementById("tipoCarga")?.addEventListener('change', toggleAparelhoFrio);
     
-    // Tema escuro/claro
     const themeBtn = document.getElementById("themeBtn");
     if(themeBtn) {
         themeBtn.addEventListener("click", () => {
@@ -273,9 +257,13 @@ function restaurarPosicaoPaineis() {
 function toggleAparelhoFrio() {
     const tipo = document.getElementById("tipoCarga").value;
     const isFrio = tipo === "frigorifica";
-    document.getElementById("container-frio-input").style.display = isFrio ? "block" : "none";
-    document.getElementById("row-an-frio").style.display = isFrio ? "flex" : "none";
-    document.getElementById("container-frio-datas").style.display = isFrio ? "block" : "none";
+    const containerFrioInput = document.getElementById("container-frio-input");
+    const rowAnFrio = document.getElementById("row-an-frio");
+    const containerFrioDatas = document.getElementById("container-frio-datas");
+    
+    if(containerFrioInput) containerFrioInput.style.display = isFrio ? "block" : "none";
+    if(rowAnFrio) rowAnFrio.style.display = isFrio ? "flex" : "none";
+    if(containerFrioDatas) containerFrioDatas.style.display = isFrio ? "block" : "none";
     atualizarFinanceiro();
 }
 
@@ -330,9 +318,12 @@ function selecionarVeiculo(id) {
             document.getElementById("tipoCarga").value = "frigorifica";
             document.getElementById("consumoFrioHora").value = v.consumoFrio;
             toggleAparelhoFrio();
+        } else {
+            document.getElementById("tipoCarga").value = "seca";
+            toggleAparelhoFrio();
         }
         atualizarFinanceiro();
-        toggleFrota();
+        if(document.getElementById('painel-frota').classList.contains('active')) toggleFrota();
     }
 }
 
@@ -355,7 +346,9 @@ function vincularFrota(elem) {
 function processarSegmentosRota(res) {
     const leg = res.routes[0].legs[0];
     const listaEscrita = document.getElementById("lista-passo-a-passo");
-    listaEscrita.innerHTML = `<div style="padding:10px;"><strong>Origem:</strong> ${leg.start_address}<br><strong>Destino:</strong> ${leg.end_address}<br><strong>Duração:</strong> ${leg.duration.text}</div>`;
+    if(listaEscrita) {
+        listaEscrita.innerHTML = `<div style="padding:10px;"><strong>Origem:</strong> ${leg.start_address}<br><strong>Destino:</strong> ${leg.end_address}<br><strong>Duração:</strong> ${leg.duration.text}</div>`;
+    }
     atualizarFinanceiro();
 }
 
@@ -363,9 +356,10 @@ function limparPainelCustos() {
     ["custoDieselLitro", "consumoDieselMedia", "custoArlaLitro", "arlaPorcentagem", "custoPedagio", "custoManutencaoKm", "consumoFrioHora", "prevColeta", "prevEntrega"].forEach(id => {
         const el = document.getElementById(id); if(el) el.value = "";
     });
-    document.getElementById("selFrotaVinculo").value = "";
-    document.getElementById("tipoCarga").value = "seca";
+    const selFrota = document.getElementById("selFrotaVinculo");
+    if(selFrota) selFrota.value = "";
+    const tipoCarga = document.getElementById("tipoCarga");
+    if(tipoCarga) tipoCarga.value = "seca";
     toggleAparelhoFrio();
     atualizarFinanceiro();
 }
-
