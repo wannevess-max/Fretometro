@@ -182,8 +182,9 @@ function atualizarFinanceiro() {
 }
 
 // --- INTERFACE E EVENTOS ---
+// --- INTERFACE E EVENTOS ---
 document.addEventListener("DOMContentLoaded", function() {
-    // Monitor de Inputs para atualizar financeiro em tempo real
+    // 1. Monitor de Inputs Financeiros (Atualiza o cálculo enquanto você digita)
     const inputsFinanceiros = [
         "valorPorKm", "valorDescarga", "valorOutrasDespesas", "custoDieselLitro", 
         "consumoDieselMedia", "custoArlaLitro", "arlaPorcentagem", "custoPedagio", 
@@ -194,10 +195,16 @@ document.addEventListener("DOMContentLoaded", function() {
         document.getElementById(id)?.addEventListener('input', atualizarFinanceiro);
     });
 
+    // 2. Gatilho para Imposto
     document.getElementById("imposto")?.addEventListener('change', atualizarFinanceiro);
-    document.getElementById("tipoCarga")?.addEventListener('change', atualizarFinanceiro);
 
-    // Lógica visual do deslocamento
+    // 3. Gatilho para Tipo de Carga (Ajustado para abrir os campos de frio e calcular)
+    document.getElementById("tipoCarga")?.addEventListener('change', function() {
+        toggleAparelhoFrio(); // <-- ISSO É O QUE FALTAVA (Chama a função que mostra os campos)
+        atualizarFinanceiro(); // <-- Recalcula o lucro com o custo do frio
+    });
+
+    // 4. Lógica visual e cálculo do deslocamento
     const selectDesloc = document.getElementById("tipoDeslocamento");
     selectDesloc?.addEventListener('change', function() {
         document.getElementById("valorDeslocamentoKm").style.display = (this.value === "remunerado_km") ? "block" : "none";
@@ -205,6 +212,7 @@ document.addEventListener("DOMContentLoaded", function() {
         atualizarFinanceiro();
     });
 
+    // 5. Gatilho para o campo de Saída (Ponto Vazio)
     const campoSaida = document.getElementById("saida");
     campoSaida?.addEventListener('input', function() {
         const container = document.getElementById("container-config-deslocamento");
@@ -212,7 +220,7 @@ document.addEventListener("DOMContentLoaded", function() {
             container.style.display = "flex";
         } else {
             container.style.display = "none";
-            selectDesloc.value = "nao_remunerado";
+            if(selectDesloc) selectDesloc.value = "nao_remunerado";
             atualizarFinanceiro();
         }
     });
@@ -336,3 +344,4 @@ function processarSegmentosRota(res) {
     listaEscrita.innerHTML = `<div style="padding:10px;"><strong>Origem:</strong> ${leg.start_address}<br><strong>Destino:</strong> ${leg.end_address}</div>`;
     atualizarFinanceiro();
 }
+
