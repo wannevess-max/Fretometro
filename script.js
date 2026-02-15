@@ -79,11 +79,25 @@ function parseMoeda(valor) {
 }
 
 function formatarMoeda(input) {
+    // 1. Pega apenas os números
     let valor = input.value.replace(/\D/g, "");
-    if (!valor) { input.value = ""; return; }
-    // AQUI ESTÁ A LÓGICA QUE VOCÊ PEDIU: 1 / 100 = 0.01
-    let resultado = (parseFloat(valor) / 100).toFixed(2);
-    input.value = "R$ " + resultado.replace(".", ",").replace(/(\d)(?=(\d{3})+(?!\d))/g, "$1.");
+    
+    // 2. Se estiver vazio, limpa o campo e sai
+    if (!valor) {
+        input.value = "";
+        return;
+    }
+
+    // 3. A MATEMÁTICA: transforma "1" em 0.01, "12" em 0.12, "123" em 1.23
+    let valorNumerico = (parseFloat(valor) / 100).toFixed(2);
+
+    // 4. A FORMATAÇÃO VISUAL: coloca o R$ e a vírgula
+    let resultado = "R$ " + valorNumerico
+        .replace(".", ",")
+        .replace(/(\d)(?=(\d{3})+(?!\d))/g, "$1.");
+
+    // 5. DEVOLVE PARA O CAMPO
+    input.value = resultado;
 }
 
 function atualizarFinanceiro() {
@@ -302,5 +316,6 @@ function processarSegmentosRota(res) {
     listaEscrita.innerHTML = `<div style="padding:10px;"><strong>Origem:</strong> ${leg.start_address}<br><strong>Destino:</strong> ${leg.end_address}</div>`;
     atualizarFinanceiro();
 }
+
 
 
